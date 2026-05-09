@@ -1,0 +1,70 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+env/
+.env
+
+# Secrets — never commit
+.env
+*.key
+*secrets*
+
+# MLflow
+mlruns/
+mlartifacts/
+
+# Pipeline outputs (generated artifacts — large, gitignored)
+outputs/
+
+# Uploads
+/tmp/ml_pipeline_uploads/
+
+# Model checkpoints
+*.pkl
+*.joblib
+*.ckpt
+*.pt
+*.pth
+
+# Data files (large CSVs)
+*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker volumes
+postgres_data/
+redis_data/
+mlflow_data/
+
+# Test coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# Logs
+*.log
+logs/

@@ -1,0 +1,89 @@
+version: "3.9"
+
+# ── Autonomous ML Pipeline Builder — Docker Compose Stack ─────────────────────
+#
+# Services:
+#   api     — FastAPI backend (port 8000)
+#   gradio  — Gradio 5 UI (port 7860)
+#   mlflow  — MLflow tracking server (port 5001)
+#
+# Usage:
+#   docker-compose up --build
+#   Open http://localhost:7860 for the Gradio UI
+#   Open http://localhost:5001 for MLflow
+#   Open http://localhost:8000/docs for FastAPI Swagger UI
+
+services:
+
+  # ── MLflow tracking server ─────────────────────────────────────────────────
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.13.0
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5001
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root /mlflow/artifacts
+    ports:
+      - "5001:5001"
+    volumes:
+      - mlflow_data:/mlflow
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5001/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── FastAPI backend ────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    ports:
+      - "8000:8000"
+    environment:
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      E2B_API_KEY: ${E2B_API_KEY:-}
+      MLFLOW_TRACKING_URI: http://mlflow:5001
+      EXECUTION_BACKEND: ${EXECUTION_BACKEND:-e2b}
+    volumes:
+      - outputs_data:/app/outputs
+      - upload_data:/tmp/ml_pipeline_uploads
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # ── Gradio frontend ────────────────────────────────────────────────────────
+  gradio:
+    build:
+      context: .
+      dockerfile: Dockerfile.gradio
+    ports:
+      - "7860:7860"
+    environment:
+      API_BASE_URL: http://api:8000
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+      E2B_API_KEY: ${E2B_API_KEY:-}
+      MLFLOW_TRACKING_URI: http://mlflow:5001
+    volumes:
+      - outputs_data:/app/outputs
+    depends_on:
+      api:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  mlflow_data:
+  outputs_data:
+  upload_data:

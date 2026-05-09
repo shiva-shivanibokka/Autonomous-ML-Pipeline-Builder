@@ -1,0 +1,42 @@
+# ── Core ML stack ─────────────────────────────────────────────────────────────
+pandas==2.2.2
+numpy==1.26.4
+scikit-learn==1.4.2
+lightgbm==4.3.0
+xgboost==2.0.3
+shap==0.44.0
+matplotlib==3.8.4
+seaborn==0.13.2
+joblib==1.4.2
+
+# ── LLM / Agent stack ─────────────────────────────────────────────────────────
+langchain==0.2.6
+langchain-core==0.2.10
+langchain-anthropic==0.1.15
+langchain-openai==0.1.9
+langgraph==0.1.5
+anthropic==0.28.0
+openai==1.30.1
+pydantic==2.7.1
+pydantic-settings==2.3.0
+
+# ── E2B sandbox ───────────────────────────────────────────────────────────────
+e2b-code-interpreter==0.0.10
+
+# ── MLflow ────────────────────────────────────────────────────────────────────
+mlflow==2.13.0
+
+# ── API backend ───────────────────────────────────────────────────────────────
+fastapi==0.111.0
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9
+
+# ── Gradio UI ─────────────────────────────────────────────────────────────────
+gradio==5.0.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+python-dotenv==1.0.1
+pyyaml==6.0.1
+plotly==5.22.0
+requests==2.32.3
+structlog==24.2.0

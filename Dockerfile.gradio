@@ -1,0 +1,30 @@
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# System dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Application code
+COPY core/ core/
+COPY agents/ agents/
+COPY pipeline/ pipeline/
+COPY sandbox/ sandbox/
+COPY ui/ ui/
+COPY configs/ configs/
+
+# Create outputs directory
+RUN mkdir -p outputs
+
+EXPOSE 7860
+
+# Set API_BASE_URL to connect to the API service in Docker Compose
+ENV API_BASE_URL=http://api:8000
+
+CMD ["python", "ui/app.py"]
