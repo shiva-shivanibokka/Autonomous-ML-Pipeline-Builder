@@ -101,6 +101,7 @@ class AgentState(TypedDict, total=False):
 
     # ── Pipeline control ───────────────────────────────────────────────────────
     pipeline_id: str  # UUID for this run (for FastAPI tracking)
+    output_dir: str  # Per-run artifact directory (outputs/<pipeline_id>)
     status: str  # "running" | "completed" | "failed"
     current_step: str  # Human-readable current agent name
     error: Optional[str]  # Set if any agent fails fatally

@@ -26,9 +26,10 @@ class TestSubprocessExecution:
         df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
         df.to_csv(csv_path, index=False)
 
+        # Use repr() so Windows backslash paths become a valid string literal.
         code = f"""
 import pandas as pd
-df = pd.read_csv('{csv_path}')
+df = pd.read_csv({csv_path!r})
 print(f'rows={{len(df)}}')
 """
         result = _execute_subprocess(code, csv_path, 30)

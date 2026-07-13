@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from pathlib import Path
 from typing import Generator
 
 from agents.state import AgentState
@@ -20,6 +21,10 @@ from pipeline.graph import get_compiled_graph
 
 logger = logging.getLogger(__name__)
 
+# Root directory for all per-run artifacts. Each run gets its own subdirectory
+# (outputs/<pipeline_id>) so concurrent runs never clobber each other's files.
+ARTIFACTS_ROOT = Path("outputs")
+
 
 def _build_initial_state(
     csv_path: str,
@@ -27,10 +32,15 @@ def _build_initial_state(
     provider: str,
     api_key: str,
     model_name: str,
+    pipeline_id: str | None = None,
 ) -> AgentState:
     """Construct the initial AgentState for a new pipeline run."""
     # Resolve API key: user-supplied takes priority, then fall back to env
     resolved_key = api_key.strip() or settings.get_api_key(provider)
+
+    run_id = pipeline_id or str(uuid.uuid4())
+    output_dir = ARTIFACTS_ROOT / run_id
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     return AgentState(
         csv_path=csv_path,
@@ -38,7 +48,8 @@ def _build_initial_state(
         provider=provider,
         api_key=resolved_key,
         model_name=model_name,
-        pipeline_id=str(uuid.uuid4()),
+        pipeline_id=run_id,
+        output_dir=str(output_dir),
         status="running",
         current_step="orchestrator",
         error=None,
@@ -57,6 +68,7 @@ def run_pipeline(
     provider: str = "anthropic",
     api_key: str = "",
     model_name: str = "",
+    pipeline_id: str | None = None,
 ) -> AgentState:
     """
     Run the full ML pipeline synchronously.
@@ -67,6 +79,8 @@ def run_pipeline(
         provider:         LLM provider ("anthropic", "openai", "groq").
         api_key:          API key (falls back to env var if empty).
         model_name:       Model name (falls back to provider default if empty).
+        pipeline_id:      Reuse this run id (so the caller can find artifacts);
+                          a new one is generated if omitted.
 
     Returns:
         The final AgentState after all agents have run.
@@ -82,6 +96,7 @@ def run_pipeline(
         provider=provider,
         api_key=api_key,
         model_name=model_name,
+        pipeline_id=pipeline_id,
     )
 
     graph = get_compiled_graph()

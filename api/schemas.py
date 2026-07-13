@@ -11,7 +11,11 @@ from pydantic import BaseModel, Field
 class PipelineRequest(BaseModel):
     """Request body for POST /pipeline/run."""
 
-    csv_path: str = Field(description="Local path to the uploaded CSV file")
+    upload_id: str = Field(
+        description="Server-issued upload id returned by POST /upload",
+        min_length=1,
+        max_length=128,
+    )
     business_problem: str = Field(
         description="Plain English description of the ML task",
         min_length=10,
@@ -62,7 +66,7 @@ class HealthResponse(BaseModel):
 class UploadResponse(BaseModel):
     """Response for POST /upload."""
 
-    csv_path: str
+    upload_id: str  # Opaque server-issued handle; pass to POST /pipeline/run
     filename: str
     n_rows: int
     n_cols: int

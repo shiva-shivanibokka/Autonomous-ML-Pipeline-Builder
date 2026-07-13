@@ -2,23 +2,30 @@
 api.main — FastAPI backend for the Autonomous ML Pipeline Builder.
 
 Endpoints:
-    POST /upload               — Upload a CSV and get a preview
-    POST /pipeline/run         — Start a pipeline run (async, returns pipeline_id)
-    GET  /pipeline/{id}/status — Poll pipeline status
-    GET  /pipeline/{id}/result — Get full pipeline result
-    GET  /pipeline/{id}/logs   — Get all log lines
-    GET  /artifacts/{filename} — Download a generated artifact (pipeline.py, Dockerfile, etc.)
-    GET  /health               — Health check
+    POST /upload                        — Upload a CSV, get an opaque upload_id + preview
+    POST /pipeline/run                  — Start a pipeline run (async, returns pipeline_id)
+    GET  /pipeline/{id}/status          — Poll pipeline status
+    GET  /pipeline/{id}/result          — Get full pipeline result
+    GET  /pipeline/{id}/logs            — Get log lines (supports ?offset=)
+    GET  /pipeline/{id}/artifacts/{f}   — Download a generated artifact for that run
+    GET  /health                        — Health check
+
+Security notes:
+    - Callers never pass filesystem paths. /upload issues an opaque upload_id; the
+      server resolves it to a path inside UPLOAD_DIR, so a client cannot make the
+      pipeline read arbitrary server files.
+    - API keys supplied for LLM calls are never stored in the run record or returned.
+    - Artifacts are namespaced per pipeline_id so concurrent runs never collide.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-import os
-import tempfile
+import re
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -34,11 +41,19 @@ from api.schemas import (
     PipelineStatusResponse,
     UploadResponse,
 )
+from core.config import settings
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
 # ── App setup ─────────────────────────────────────────────────────────────────
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Fail loudly on boot if production is misconfigured (unsafe exec, open CORS).
+    settings.validate_for_production()
+    yield
+
 
 app = FastAPI(
     title="Autonomous ML Pipeline Builder API",
@@ -47,24 +62,51 @@ app = FastAPI(
         "Upload a CSV, describe your ML problem, and watch AI agents "
         "build, evaluate, and deploy a complete ML pipeline."
     ),
+    lifespan=lifespan,
 )
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_methods=["*"],
+    allow_origins=settings.cors_origins,
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
-# ── In-memory state store (replace with Redis for multi-worker) ───────────────
+
+# ── In-memory state store (replaced by a persistent store in Phase C) ─────────
 _pipeline_states: dict[str, dict[str, Any]] = {}
 _executor = ThreadPoolExecutor(max_workers=4)
 
-UPLOAD_DIR = Path(tempfile.gettempdir()) / "ml_pipeline_uploads"
+# Uploads and artifacts live under the working directory. UPLOAD_DIR holds raw
+# CSVs keyed by upload_id; ARTIFACTS_ROOT/<pipeline_id> holds generated files.
+UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
+ARTIFACTS_ROOT = Path("outputs")
+ARTIFACTS_ROOT.mkdir(exist_ok=True)
 
-ARTIFACTS_DIR = Path("outputs")
-ARTIFACTS_DIR.mkdir(exist_ok=True)
+_ID_RE = re.compile(r"^[a-f0-9]{32}$")  # uuid4().hex — the only shape we accept
+_MAX_UPLOAD_BYTES = settings.max_upload_mb * 1024 * 1024
+
+_ALLOWED_ARTIFACTS = {
+    "pipeline.py",
+    "requirements.txt",
+    "fastapi_endpoint.py",
+    "Dockerfile",
+    "openapi_spec.json",
+    "shap_summary.png",
+    "model.pkl",
+    "feature_schema.json",
+}
+
+
+def _resolve_upload(upload_id: str) -> Path:
+    """Map an opaque upload_id back to its CSV path, rejecting anything unsafe."""
+    if not _ID_RE.match(upload_id):
+        raise HTTPException(status_code=400, detail="Malformed upload_id")
+    path = UPLOAD_DIR / f"{upload_id}.csv"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="Upload not found or expired")
+    return path
 
 
 # ── Health ────────────────────────────────────────────────────────────────────
@@ -80,24 +122,31 @@ async def health():
 
 @app.post("/upload", response_model=UploadResponse, tags=["Pipeline"])
 async def upload_csv(file: UploadFile = File(...)):
-    """Upload a CSV file and return a preview."""
-    if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported.")
+    """Store an uploaded CSV under a server-issued id and return a preview."""
+    if not file.filename or not file.filename.lower().endswith(".csv"):
+        raise HTTPException(status_code=400, detail="Only .csv files are supported.")
 
     content = await file.read()
-    filename = f"{uuid.uuid4().hex}_{file.filename}"
-    csv_path = UPLOAD_DIR / filename
+    if len(content) == 0:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty.")
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File exceeds the {settings.max_upload_mb} MB limit.",
+        )
 
-    with open(csv_path, "wb") as f:
-        f.write(content)
+    upload_id = uuid.uuid4().hex
+    csv_path = UPLOAD_DIR / f"{upload_id}.csv"
+    csv_path.write_bytes(content)
 
     try:
         df = pd.read_csv(csv_path)
     except Exception as exc:
+        csv_path.unlink(missing_ok=True)
         raise HTTPException(status_code=400, detail=f"Could not parse CSV: {exc}")
 
     return UploadResponse(
-        csv_path=str(csv_path),
+        upload_id=upload_id,
         filename=file.filename,
         n_rows=len(df),
         n_cols=len(df.columns),
@@ -109,19 +158,22 @@ async def upload_csv(file: UploadFile = File(...)):
 # ── Pipeline run (async) ───────────────────────────────────────────────────────
 
 
-def _run_pipeline_sync(pipeline_id: str, request: PipelineRequest) -> None:
+def _run_pipeline_sync(pipeline_id: str, csv_path: str, request: PipelineRequest) -> None:
     """Run pipeline in a thread pool — called by asyncio executor."""
     from pipeline.runner import run_pipeline
 
     _pipeline_states[pipeline_id]["status"] = "running"
     try:
         final_state = run_pipeline(
-            csv_path=request.csv_path,
+            csv_path=csv_path,
             business_problem=request.business_problem,
             provider=request.provider,
             api_key=request.api_key,
             model_name=request.model_name,
+            pipeline_id=pipeline_id,
         )
+        # Never retain the caller's API key in the stored record.
+        final_state.pop("api_key", None)
         _pipeline_states[pipeline_id].update(
             {
                 "status": final_state.get("status", "completed"),
@@ -131,31 +183,19 @@ def _run_pipeline_sync(pipeline_id: str, request: PipelineRequest) -> None:
         )
     except Exception as exc:
         logger.error("Pipeline %s crashed: %s", pipeline_id, exc, exc_info=True)
-        _pipeline_states[pipeline_id].update(
-            {
-                "status": "failed",
-                "error": str(exc),
-            }
-        )
+        _pipeline_states[pipeline_id].update({"status": "failed", "error": str(exc)})
 
 
 @app.post("/pipeline/run", tags=["Pipeline"])
 async def run_pipeline_endpoint(request: PipelineRequest):
     """Start a pipeline run. Returns pipeline_id for polling."""
-    if not Path(request.csv_path).exists():
-        raise HTTPException(
-            status_code=400, detail=f"CSV not found: {request.csv_path}"
-        )
+    csv_path = _resolve_upload(request.upload_id)
 
-    pipeline_id = str(uuid.uuid4())
-    _pipeline_states[pipeline_id] = {
-        "status": "pending",
-        "state": None,
-        "error": None,
-    }
+    pipeline_id = uuid.uuid4().hex
+    _pipeline_states[pipeline_id] = {"status": "pending", "state": None, "error": None}
 
     loop = asyncio.get_event_loop()
-    loop.run_in_executor(_executor, _run_pipeline_sync, pipeline_id, request)
+    loop.run_in_executor(_executor, _run_pipeline_sync, pipeline_id, str(csv_path), request)
 
     return {"pipeline_id": pipeline_id, "status": "pending"}
 
@@ -198,7 +238,7 @@ async def get_pipeline_result(pipeline_id: str):
         raise HTTPException(status_code=404, detail="Pipeline not found")
 
     record = _pipeline_states[pipeline_id]
-    if record["status"] == "running":
+    if record["status"] in ("pending", "running"):
         raise HTTPException(status_code=202, detail="Pipeline still running")
 
     state = record.get("state") or {}
@@ -236,27 +276,20 @@ async def get_pipeline_logs(pipeline_id: str, offset: int = 0):
 
     state = _pipeline_states[pipeline_id].get("state") or {}
     all_logs = state.get("logs", [])
-    return {"logs": all_logs[offset:], "total": len(all_logs)}
+    return {"logs": all_logs[max(offset, 0):], "total": len(all_logs)}
 
 
 # ── Artifacts download ────────────────────────────────────────────────────────
 
-_ALLOWED_ARTIFACTS = {
-    "pipeline.py",
-    "requirements.txt",
-    "fastapi_endpoint.py",
-    "Dockerfile",
-    "openapi_spec.json",
-    "shap_summary.png",
-}
 
-
-@app.get("/artifacts/{filename}", tags=["Artifacts"])
-async def download_artifact(filename: str):
-    """Download a generated artifact file."""
+@app.get("/pipeline/{pipeline_id}/artifacts/{filename}", tags=["Artifacts"])
+async def download_artifact(pipeline_id: str, filename: str):
+    """Download a generated artifact for a specific run."""
+    if not _ID_RE.match(pipeline_id):
+        raise HTTPException(status_code=400, detail="Malformed pipeline_id")
     if filename not in _ALLOWED_ARTIFACTS:
         raise HTTPException(status_code=400, detail=f"Unknown artifact: {filename}")
-    path = ARTIFACTS_DIR / filename
+    path = ARTIFACTS_ROOT / pipeline_id / filename
     if not path.exists():
         raise HTTPException(
             status_code=404, detail=f"Artifact not yet generated: {filename}"
@@ -266,7 +299,6 @@ async def download_artifact(filename: str):
 
 if __name__ == "__main__":
     import uvicorn
-    from core.config import settings
 
     uvicorn.run(
         "api.main:app",

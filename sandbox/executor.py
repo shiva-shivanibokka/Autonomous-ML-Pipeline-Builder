@@ -193,6 +193,17 @@ def execute_with_retry(
     _timeout = timeout or settings.sandbox_timeout_seconds
     use_e2b = settings.execution_backend == "e2b" and bool(settings.e2b_api_key.strip())
 
+    # Security gate: never run LLM-generated code on the host unless the operator
+    # has explicitly opted in via ALLOW_LOCAL_EXEC (local dev only). In production
+    # this stays off, so a missing E2B key fails loudly instead of silently running
+    # arbitrary code on the server.
+    if not use_e2b and not settings.allow_local_exec:
+        raise RuntimeError(
+            "Refusing to execute generated code: E2B sandbox is not configured and "
+            "host execution is disabled. Set E2B_API_KEY (recommended), or set "
+            "ALLOW_LOCAL_EXEC=true for local development only."
+        )
+
     current_code = code
     last_error = ""
 

@@ -49,9 +49,19 @@ class Settings(BaseSettings):
     max_correction_retries: int = Field(default=3, alias="MAX_CORRECTION_RETRIES")
     sandbox_timeout_seconds: int = Field(default=120, alias="SANDBOX_TIMEOUT_SECONDS")
 
-    # ── HF Spaces compatibility ────────────────────────────────────────────────
-    # On HF Spaces, E2B is available; set to "subprocess" for local fallback
+    # ── Execution backend ──────────────────────────────────────────────────────
+    # "e2b" runs generated code in an isolated cloud sandbox (safe, recommended).
+    # "subprocess" runs it on THIS host — arbitrary code execution, local dev only.
     execution_backend: str = Field(default="e2b", alias="EXECUTION_BACKEND")
+    # Hard gate: subprocess execution is refused unless this is explicitly enabled.
+    # Never enable it on a publicly reachable deployment.
+    allow_local_exec: bool = Field(default=False, alias="ALLOW_LOCAL_EXEC")
+
+    # ── Deployment / security ──────────────────────────────────────────────────
+    app_env: str = Field(default="development", alias="APP_ENV")  # development | production
+    # Comma-separated list of allowed CORS origins (the Vercel frontend URL in prod).
+    allowed_origins: str = Field(default="*", alias="ALLOWED_ORIGINS")
+    max_upload_mb: int = Field(default=50, alias="MAX_UPLOAD_MB")
 
     @field_validator("default_provider")
     @classmethod
@@ -62,6 +72,39 @@ class Settings(BaseSettings):
         return v
 
     model_config = {"populate_by_name": True, "extra": "ignore"}
+
+    @property
+    def is_production(self) -> bool:
+        return self.app_env.strip().lower() == "production"
+
+    @property
+    def cors_origins(self) -> list[str]:
+        raw = self.allowed_origins.strip()
+        if raw == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
+    def validate_for_production(self) -> None:
+        """Fail loudly at startup if prod is misconfigured. Called by the API on boot."""
+        if not self.is_production:
+            return
+        problems = []
+        if self.execution_backend != "e2b" or not self.e2b_api_key.strip():
+            problems.append(
+                "Production requires EXECUTION_BACKEND=e2b and a valid E2B_API_KEY "
+                "(host subprocess execution is unsafe in production)."
+            )
+        if self.allow_local_exec:
+            problems.append("ALLOW_LOCAL_EXEC must be false in production.")
+        if self.cors_origins == ["*"]:
+            problems.append(
+                "ALLOWED_ORIGINS must be an explicit allowlist in production, not '*'."
+            )
+        if problems:
+            raise RuntimeError(
+                "Refusing to start in production — misconfiguration:\n  - "
+                + "\n  - ".join(problems)
+            )
 
     def has_provider_key(self, provider: str) -> bool:
         """Check whether a valid API key is configured for the given provider."""

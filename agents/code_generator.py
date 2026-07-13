@@ -146,14 +146,15 @@ def run_code_generator(state: AgentState) -> dict:
 
         logs.append(f"[{timestamp}] CODE GENERATOR — Done.")
 
-        # Save pipeline code to disk for download
+        # Save pipeline code to the per-run output directory for download
         import os
 
-        os.makedirs("outputs", exist_ok=True)
-        with open("outputs/pipeline.py", "w") as f:
+        out_dir = state.get("output_dir", "outputs")
+        os.makedirs(out_dir, exist_ok=True)
+        with open(os.path.join(out_dir, "pipeline.py"), "w", encoding="utf-8") as f:
             f.write(pipeline_code)
 
-        with open("outputs/requirements.txt", "w") as f:
+        with open(os.path.join(out_dir, "requirements.txt"), "w", encoding="utf-8") as f:
             f.write(REQUIREMENTS_TEMPLATE)
 
         # Start building deployment artifacts

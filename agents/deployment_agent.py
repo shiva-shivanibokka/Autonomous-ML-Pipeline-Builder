@@ -210,16 +210,17 @@ def run_deployment_agent(state: AgentState) -> dict:
             winner, task_type, feature_names, target_col
         )
 
-        # Write all artifacts to disk
-        os.makedirs("outputs", exist_ok=True)
+        # Write all artifacts to the per-run output directory
+        out_dir = state.get("output_dir", "outputs")
+        os.makedirs(out_dir, exist_ok=True)
 
-        with open("outputs/fastapi_endpoint.py", "w") as f:
+        with open(os.path.join(out_dir, "fastapi_endpoint.py"), "w", encoding="utf-8") as f:
             f.write(fastapi_code)
 
-        with open("outputs/Dockerfile", "w") as f:
+        with open(os.path.join(out_dir, "Dockerfile"), "w", encoding="utf-8") as f:
             f.write(DOCKERFILE_TEMPLATE)
 
-        with open("outputs/openapi_spec.json", "w") as f:
+        with open(os.path.join(out_dir, "openapi_spec.json"), "w", encoding="utf-8") as f:
             json.dump(openapi_spec, f, indent=2)
 
         logs.append(f"[{timestamp}] DEPLOYMENT AGENT — FastAPI endpoint generated.")

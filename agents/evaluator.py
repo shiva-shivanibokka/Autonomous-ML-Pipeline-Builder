@@ -262,12 +262,13 @@ def run_evaluator(state: AgentState) -> dict:
                         task_type=task_type,
                         output_dir=tmpdir,
                     )
-                    # Move to permanent location
+                    # Move to permanent per-run location
                     if shap_plot_path:
                         import shutil
 
-                        perm_path = os.path.join("outputs", "shap_summary.png")
-                        os.makedirs("outputs", exist_ok=True)
+                        out_dir = state.get("output_dir", "outputs")
+                        os.makedirs(out_dir, exist_ok=True)
+                        perm_path = os.path.join(out_dir, "shap_summary.png")
                         shutil.copy(shap_plot_path, perm_path)
                         shap_plot_path = perm_path
 

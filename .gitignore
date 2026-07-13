@@ -30,6 +30,7 @@ outputs/
 
 # Uploads
 /tmp/ml_pipeline_uploads/
+uploads/
 
 # Model checkpoints
 *.pkl
