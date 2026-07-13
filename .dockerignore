@@ -1,0 +1,42 @@
+# Frontend (deploys separately to Vercel)
+web/
+
+# Tests, docs, CI (keep knowledge/*.md — the RAG corpus is needed at runtime)
+tests/
+docs/
+.github/
+/README.md
+/AUDIT.md
+
+# Python caches / envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local data & artifacts (created at runtime, never baked into the image)
+outputs/
+uploads/
+data/
+mlruns/
+mlartifacts/
+runs.db
+*.csv
+*.pkl
+*.joblib
+
+# Local compose / dev-only Dockerfiles
+docker-compose.yml
+Dockerfile.gradio
+Dockerfile.api
+
+# Secrets & git
+.env
+.env.*
+.git/
+.gitignore
+.idea/
+.vscode/
