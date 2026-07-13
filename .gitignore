@@ -28,9 +28,11 @@ mlartifacts/
 # Pipeline outputs (generated artifacts — large, gitignored)
 outputs/
 
-# Uploads
+# Uploads & run store
 /tmp/ml_pipeline_uploads/
 uploads/
+data/
+runs.db
 
 # Model checkpoints
 *.pkl

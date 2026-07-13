@@ -65,3 +65,14 @@ def test_non_csv_upload_rejected(client):
 def test_artifact_route_rejects_unknown_filename(client):
     r = client.get(f"/pipeline/{'a' * 32}/artifacts/passwd")
     assert r.status_code == 400
+
+
+def test_metrics_endpoint_exposes_prometheus(client):
+    r = client.get("/metrics")
+    assert r.status_code == 200
+    assert "pipeline_runs_started_total" in r.text
+
+
+def test_status_unknown_pipeline_is_404(client):
+    r = client.get(f"/pipeline/{'b' * 32}/status")
+    assert r.status_code == 404

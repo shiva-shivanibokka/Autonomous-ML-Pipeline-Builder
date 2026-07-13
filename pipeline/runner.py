@@ -13,7 +13,7 @@ from __future__ import annotations
 import logging
 import uuid
 from pathlib import Path
-from typing import Generator
+from typing import Callable, Generator, Optional
 
 from agents.state import AgentState
 from core.config import settings
@@ -108,6 +108,49 @@ def run_pipeline(
     )
 
     final_state = graph.invoke(initial_state)
+    return final_state
+
+
+def run_pipeline_streaming(
+    csv_path: str,
+    business_problem: str,
+    provider: str = "anthropic",
+    api_key: str = "",
+    model_name: str = "",
+    pipeline_id: str | None = None,
+    on_update: Optional[Callable[[AgentState], None]] = None,
+) -> AgentState:
+    """
+    Run the pipeline, invoking `on_update(state)` after each agent completes so the
+    caller can persist live progress, and returning the final state.
+
+    This is the API's entry point: it gets both incremental logs (for the frontend's
+    live view) and the final state (for the result), which the plain generator can't
+    provide together.
+    """
+    from core.providers import PROVIDER_DEFAULTS
+
+    if not model_name:
+        model_name = PROVIDER_DEFAULTS.get(provider, "")
+
+    initial_state = _build_initial_state(
+        csv_path=csv_path,
+        business_problem=business_problem,
+        provider=provider,
+        api_key=api_key,
+        model_name=model_name,
+        pipeline_id=pipeline_id,
+    )
+
+    graph = get_compiled_graph()
+    final_state: AgentState = initial_state
+    for chunk in graph.stream(initial_state, stream_mode="values"):
+        final_state = chunk
+        if on_update is not None:
+            try:
+                on_update(chunk)
+            except Exception:  # persistence must never crash the pipeline
+                logger.warning("on_update callback failed", exc_info=True)
     return final_state
 
 

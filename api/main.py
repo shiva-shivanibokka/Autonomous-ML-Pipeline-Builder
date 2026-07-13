@@ -9,6 +9,7 @@ Endpoints:
     GET  /pipeline/{id}/logs            — Get log lines (supports ?offset=)
     GET  /pipeline/{id}/artifacts/{f}   — Download a generated artifact for that run
     GET  /health                        — Health check
+    GET  /metrics                       — Prometheus metrics
 
 Security notes:
     - Callers never pass filesystem paths. /upload issues an opaque upload_id; the
@@ -16,13 +17,17 @@ Security notes:
       pipeline read arbitrary server files.
     - API keys supplied for LLM calls are never stored in the run record or returned.
     - Artifacts are namespaced per pipeline_id so concurrent runs never collide.
+
+Persistence:
+    - Run state lives in a SQLite-backed store (survives restarts, TTL-swept), not a
+      process dict, so it neither leaks memory nor vanishes on redeploy.
 """
 
 from __future__ import annotations
 
 import asyncio
-import logging
 import re
+import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
@@ -30,9 +35,15 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    Counter,
+    Histogram,
+    generate_latest,
+)
 
 from api.schemas import (
     HealthResponse,
@@ -42,16 +53,30 @@ from api.schemas import (
     UploadResponse,
 )
 from core.config import settings
+from core.logging_config import configure_logging, get_logger
+from core.store import RunStore
 
-logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO)
+configure_logging()
+log = get_logger("api")
+
+
+# ── Prometheus metrics ────────────────────────────────────────────────────────
+RUNS_STARTED = Counter("pipeline_runs_started_total", "Pipeline runs started")
+RUNS_COMPLETED = Counter("pipeline_runs_completed_total", "Pipeline runs completed")
+RUNS_FAILED = Counter("pipeline_runs_failed_total", "Pipeline runs failed")
+REQ_LATENCY = Histogram(
+    "http_request_duration_seconds", "HTTP request latency", ["method", "path"]
+)
+
 
 # ── App setup ─────────────────────────────────────────────────────────────────
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Fail loudly on boot if production is misconfigured (unsafe exec, open CORS).
     settings.validate_for_production()
+    log.info("api_startup", app_env=settings.app_env, backend=settings.execution_backend)
     yield
 
 
@@ -73,12 +98,30 @@ app.add_middleware(
 )
 
 
-# ── In-memory state store (replaced by a persistent store in Phase C) ─────────
-_pipeline_states: dict[str, dict[str, Any]] = {}
+@app.middleware("http")
+async def observe_requests(request: Request, call_next):
+    start = time.perf_counter()
+    response = await call_next(request)
+    elapsed = time.perf_counter() - start
+    path = request.url.path
+    REQ_LATENCY.labels(request.method, path).observe(elapsed)
+    log.info(
+        "request",
+        method=request.method,
+        path=path,
+        status=response.status_code,
+        latency_ms=round(elapsed * 1000, 1),
+    )
+    return response
+
+
+# ── Storage & execution ───────────────────────────────────────────────────────
 _executor = ThreadPoolExecutor(max_workers=4)
 
-# Uploads and artifacts live under the working directory. UPLOAD_DIR holds raw
-# CSVs keyed by upload_id; ARTIFACTS_ROOT/<pipeline_id> holds generated files.
+DATA_DIR = Path("data")
+DATA_DIR.mkdir(exist_ok=True)
+_store = RunStore(db_path=DATA_DIR / "runs.db")
+
 UPLOAD_DIR = Path("uploads")
 UPLOAD_DIR.mkdir(exist_ok=True)
 ARTIFACTS_ROOT = Path("outputs")
@@ -99,6 +142,10 @@ _ALLOWED_ARTIFACTS = {
 }
 
 
+def _now() -> float:
+    return time.time()
+
+
 def _resolve_upload(upload_id: str) -> Path:
     """Map an opaque upload_id back to its CSV path, rejecting anything unsafe."""
     if not _ID_RE.match(upload_id):
@@ -109,12 +156,33 @@ def _resolve_upload(upload_id: str) -> Path:
     return path
 
 
-# ── Health ────────────────────────────────────────────────────────────────────
+def _safe_state(state: dict[str, Any]) -> dict[str, Any]:
+    """A JSON-serialisable snapshot of pipeline state (no keys, no model objects)."""
+    out: dict[str, Any] = {}
+    for k, v in state.items():
+        if k in ("api_key", "shap_sample"):
+            continue
+        if k == "model_results":
+            out[k] = {
+                name: {kk: vv for kk, vv in (r or {}).items() if kk != "model_object"}
+                for name, r in (v or {}).items()
+            }
+        else:
+            out[k] = v
+    return out
+
+
+# ── Health & metrics ──────────────────────────────────────────────────────────
 
 
 @app.get("/health", response_model=HealthResponse, tags=["System"])
 async def health():
     return HealthResponse()
+
+
+@app.get("/metrics", tags=["System"])
+async def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 
 # ── Upload ────────────────────────────────────────────────────────────────────
@@ -159,31 +227,45 @@ async def upload_csv(file: UploadFile = File(...)):
 
 
 def _run_pipeline_sync(pipeline_id: str, csv_path: str, request: PipelineRequest) -> None:
-    """Run pipeline in a thread pool — called by asyncio executor."""
-    from pipeline.runner import run_pipeline
+    """Run pipeline in a worker thread, persisting live progress to the store."""
+    from pipeline.runner import run_pipeline_streaming
 
-    _pipeline_states[pipeline_id]["status"] = "running"
+    RUNS_STARTED.inc()
+    _store.update(pipeline_id, _now(), status="running")
+
+    def _on_update(state: dict) -> None:
+        _store.update(
+            pipeline_id,
+            _now(),
+            status=state.get("status", "running"),
+            state=_safe_state(state),
+            error=state.get("error"),
+        )
+
     try:
-        final_state = run_pipeline(
+        final_state = run_pipeline_streaming(
             csv_path=csv_path,
             business_problem=request.business_problem,
             provider=request.provider,
             api_key=request.api_key,
             model_name=request.model_name,
             pipeline_id=pipeline_id,
+            on_update=_on_update,
         )
-        # Never retain the caller's API key in the stored record.
         final_state.pop("api_key", None)
-        _pipeline_states[pipeline_id].update(
-            {
-                "status": final_state.get("status", "completed"),
-                "state": final_state,
-                "error": final_state.get("error"),
-            }
+        status = final_state.get("status", "completed")
+        _store.update(
+            pipeline_id,
+            _now(),
+            status=status,
+            state=_safe_state(final_state),
+            error=final_state.get("error"),
         )
+        (RUNS_FAILED if status == "failed" else RUNS_COMPLETED).inc()
     except Exception as exc:
-        logger.error("Pipeline %s crashed: %s", pipeline_id, exc, exc_info=True)
-        _pipeline_states[pipeline_id].update({"status": "failed", "error": str(exc)})
+        RUNS_FAILED.inc()
+        log.error("pipeline_crashed", pipeline_id=pipeline_id, error=str(exc))
+        _store.update(pipeline_id, _now(), status="failed", error=str(exc))
 
 
 @app.post("/pipeline/run", tags=["Pipeline"])
@@ -192,7 +274,7 @@ async def run_pipeline_endpoint(request: PipelineRequest):
     csv_path = _resolve_upload(request.upload_id)
 
     pipeline_id = uuid.uuid4().hex
-    _pipeline_states[pipeline_id] = {"status": "pending", "state": None, "error": None}
+    _store.create(pipeline_id, _now())
 
     loop = asyncio.get_event_loop()
     loop.run_in_executor(_executor, _run_pipeline_sync, pipeline_id, str(csv_path), request)
@@ -203,6 +285,13 @@ async def run_pipeline_endpoint(request: PipelineRequest):
 # ── Status polling ────────────────────────────────────────────────────────────
 
 
+def _require_record(pipeline_id: str) -> dict:
+    record = _store.get(pipeline_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail="Pipeline not found")
+    return record
+
+
 @app.get(
     "/pipeline/{pipeline_id}/status",
     response_model=PipelineStatusResponse,
@@ -210,10 +299,7 @@ async def run_pipeline_endpoint(request: PipelineRequest):
 )
 async def get_pipeline_status(pipeline_id: str):
     """Poll the current status of a running pipeline."""
-    if pipeline_id not in _pipeline_states:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
-
-    record = _pipeline_states[pipeline_id]
+    record = _require_record(pipeline_id)
     state = record.get("state") or {}
     return PipelineStatusResponse(
         pipeline_id=pipeline_id,
@@ -234,10 +320,7 @@ async def get_pipeline_status(pipeline_id: str):
 )
 async def get_pipeline_result(pipeline_id: str):
     """Get the full result of a completed pipeline."""
-    if pipeline_id not in _pipeline_states:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
-
-    record = _pipeline_states[pipeline_id]
+    record = _require_record(pipeline_id)
     if record["status"] in ("pending", "running"):
         raise HTTPException(status_code=202, detail="Pipeline still running")
 
@@ -271,10 +354,8 @@ async def get_pipeline_result(pipeline_id: str):
 @app.get("/pipeline/{pipeline_id}/logs", tags=["Pipeline"])
 async def get_pipeline_logs(pipeline_id: str, offset: int = 0):
     """Get log lines from a pipeline run, starting at offset."""
-    if pipeline_id not in _pipeline_states:
-        raise HTTPException(status_code=404, detail="Pipeline not found")
-
-    state = _pipeline_states[pipeline_id].get("state") or {}
+    record = _require_record(pipeline_id)
+    state = record.get("state") or {}
     all_logs = state.get("logs", [])
     return {"logs": all_logs[max(offset, 0):], "total": len(all_logs)}
 
