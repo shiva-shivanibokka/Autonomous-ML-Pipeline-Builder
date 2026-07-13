@@ -22,9 +22,12 @@ class ModelResult(TypedDict, total=False):
     """Result from a single model training sub-agent."""
 
     model_name: str
-    model_object: Any  # The fitted model (not serialised in state)
+    model_object: Any  # The fitted sklearn Pipeline (prep + model); not serialised in state
     params: dict[str, Any]
-    metrics: dict[str, float]  # auc, f1, precision, recall, rmse, r2, etc.
+    metrics: dict[str, float]  # holdout: auc, f1, precision, recall, rmse, r2, etc.
+    cv_mean: float  # cross-validation score mean (leakage-free)
+    cv_std: float  # cross-validation score std
+    cv_metric: str  # which scorer the CV used (e.g. "f1_weighted", "r2")
     feature_importance: dict[str, float]  # feature_name → importance score
     train_time_seconds: float
     memory_mb: float
@@ -110,6 +113,8 @@ class AgentState(TypedDict, total=False):
     dataset_profile: Optional[DatasetProfile]
     feature_result: Optional[FeatureEngineeringResult]
     model_results: dict[str, ModelResult]  # model_name → result
+    feature_schema: list[dict[str, str]]  # raw input columns [{name, dtype}] for inference
+    shap_sample: list[dict[str, Any]]  # held-out test rows (raw features) for SHAP
     evaluation_result: Optional[EvaluationResult]
     deployment_artifacts: Optional[DeploymentArtifacts]
 

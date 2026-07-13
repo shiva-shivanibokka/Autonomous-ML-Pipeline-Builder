@@ -25,8 +25,16 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, StratifiedKFold, KFold
-from sklearn.preprocessing import LabelEncoder
+from sklearn.compose import ColumnTransformer
+from sklearn.impute import SimpleImputer
+from sklearn.model_selection import (
+    train_test_split,
+    cross_val_score,
+    StratifiedKFold,
+    KFold,
+)
+from sklearn.pipeline import Pipeline
+from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
 from sklearn.metrics import (
     roc_auc_score,
     f1_score,
@@ -44,12 +52,48 @@ from core.config import settings
 
 logger = logging.getLogger(__name__)
 
+# Above this many training rows we skip cross-validation to keep runs snappy.
+# ponytail: fixed threshold; make it configurable if large datasets become common.
+_CV_ROW_CAP = 50_000
+
+
+def _build_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
+    """
+    Build a leakage-safe preprocessing transformer.
+
+    Numeric   → median impute + standardize.
+    Categorical → most-frequent impute + one-hot (unknown categories ignored).
+
+    Fit happens inside each model's Pipeline on the training fold ONLY, so the
+    test set never influences imputation statistics, scaling, or encoding.
+    """
+    numeric_cols = X.select_dtypes(include=[np.number]).columns.tolist()
+    categorical_cols = X.select_dtypes(exclude=[np.number]).columns.tolist()
+
+    numeric_pipe = Pipeline(
+        [("impute", SimpleImputer(strategy="median")), ("scale", StandardScaler())]
+    )
+    categorical_pipe = Pipeline(
+        [
+            ("impute", SimpleImputer(strategy="most_frequent")),
+            ("onehot", OneHotEncoder(handle_unknown="ignore", max_categories=20)),
+        ]
+    )
+    return ColumnTransformer(
+        [
+            ("num", numeric_pipe, numeric_cols),
+            ("cat", categorical_pipe, categorical_cols),
+        ],
+        remainder="drop",
+    )
+
+
 # ── Model factories ────────────────────────────────────────────────────────────
 
 
-def _make_model(model_name: str, task_type: str, is_imbalanced: bool) -> Any:
-    """Return a freshly instantiated model for the given name."""
-    scale_pos = 10 if is_imbalanced and task_type == "classification" else 1
+def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
+    """Return a freshly instantiated estimator. `scale_pos` weights the positive class."""
+    is_imbalanced = scale_pos > 1
 
     if model_name == "lightgbm":
         import lightgbm as lgb
@@ -89,7 +133,7 @@ def _make_model(model_name: str, task_type: str, is_imbalanced: bool) -> Any:
                 colsample_bytree=0.8,
                 scale_pos_weight=scale_pos,
                 eval_metric="logloss",
-                use_label_encoder=False,
+                # use_label_encoder was removed in xgboost 2.x — passing it now errors.
                 random_state=42,
                 verbosity=0,
             )
@@ -187,52 +231,81 @@ def _compute_metrics(
     return metrics
 
 
+def _cross_validate(pipe: Pipeline, X_train, y_train, task_type: str) -> tuple[float, float, str]:
+    """Leakage-free CV score (prep is re-fit inside each fold). Skips huge datasets."""
+    if len(X_train) > _CV_ROW_CAP:
+        return 0.0, 0.0, "skipped(n>cap)"
+    if task_type == "classification":
+        scorer = "f1_weighted"
+        splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+    else:
+        scorer = "r2"
+        splitter = KFold(n_splits=5, shuffle=True, random_state=42)
+    try:
+        scores = cross_val_score(pipe, X_train, y_train, cv=splitter, scoring=scorer, n_jobs=1)
+        return round(float(scores.mean()), 4), round(float(scores.std()), 4), scorer
+    except Exception as exc:
+        logger.warning("CV failed for a model (non-fatal): %s", exc)
+        return 0.0, 0.0, f"failed:{scorer}"
+
+
 async def _train_single_model(
     model_name: str,
-    X_train: np.ndarray,
-    X_test: np.ndarray,
+    preprocessor: ColumnTransformer,
+    X_train: pd.DataFrame,
+    X_test: pd.DataFrame,
     y_train: np.ndarray,
     y_test: np.ndarray,
     task_type: str,
-    is_imbalanced: bool,
+    scale_pos: float,
     provider: str,
-    api_key: str,
-    model_llm_name: str,
-    feature_names: list[str],
 ) -> tuple[str, ModelResult]:
-    """Train a single model asynchronously. Returns (model_name, ModelResult)."""
+    """Train one model (prep+estimator Pipeline) asynchronously. Returns (name, ModelResult)."""
     loop = asyncio.get_event_loop()
 
     def _train():
         start = time.time()
         tracemalloc.start()
 
-        model = _make_model(model_name, task_type, is_imbalanced)
-        model.fit(X_train, y_train)
+        # Each model gets its OWN cloned preprocessor so the fit is per-pipeline.
+        from sklearn.base import clone
+
+        estimator = _make_model(model_name, task_type, scale_pos)
+        pipe = Pipeline([("prep", clone(preprocessor)), ("model", estimator)])
+
+        # Cross-validate BEFORE the final fit (prep re-fit inside every fold → no leakage).
+        cv_mean, cv_std, cv_metric = _cross_validate(pipe, X_train, y_train, task_type)
+
+        pipe.fit(X_train, y_train)
 
         elapsed = time.time() - start
         _, peak_mem = tracemalloc.get_traced_memory()
         tracemalloc.stop()
 
-        metrics = _compute_metrics(model, X_test, y_test, task_type)
+        metrics = _compute_metrics(pipe, X_test, y_test, task_type)
 
-        # Feature importance
+        # Feature importance mapped onto the transformed feature names.
         fi = {}
-        if hasattr(model, "feature_importances_"):
-            fi = dict(zip(feature_names, model.feature_importances_.tolist()))
-        elif hasattr(model, "coef_"):
-            coef = model.coef_
-            if coef.ndim > 1:
-                coef = np.abs(coef).mean(axis=0)
-            fi = dict(zip(feature_names, coef.tolist()))
+        try:
+            feat_names = pipe.named_steps["prep"].get_feature_names_out().tolist()
+            model = pipe.named_steps["model"]
+            if hasattr(model, "feature_importances_"):
+                fi = dict(zip(feat_names, model.feature_importances_.tolist()))
+            elif hasattr(model, "coef_"):
+                coef = model.coef_
+                if coef.ndim > 1:
+                    coef = np.abs(coef).mean(axis=0)
+                fi = dict(zip(feat_names, np.ravel(coef).tolist()))
+        except Exception:
+            fi = {}
 
         # Log to MLflow
         try:
             run_id = log_training_run(
-                model=model,
+                model=pipe,
                 model_name=model_name,
-                params={"task_type": task_type, "is_imbalanced": is_imbalanced},
-                metrics=metrics,
+                params={"task_type": task_type, "scale_pos_weight": scale_pos},
+                metrics={**metrics, "cv_mean": cv_mean, "cv_std": cv_std},
                 tags={"agent": "model_trainer", "provider": provider},
                 register=False,
             )
@@ -241,9 +314,12 @@ async def _train_single_model(
 
         return ModelResult(
             model_name=model_name,
-            model_object=model,
+            model_object=pipe,
             params={"task_type": task_type},
             metrics=metrics,
+            cv_mean=cv_mean,
+            cv_std=cv_std,
+            cv_metric=cv_metric,
             feature_importance=fi,
             train_time_seconds=round(elapsed, 2),
             memory_mb=round(peak_mem / 1024 / 1024, 2),
@@ -261,6 +337,9 @@ async def _train_single_model(
             model_object=None,
             params={},
             metrics={},
+            cv_mean=0.0,
+            cv_std=0.0,
+            cv_metric="",
             feature_importance={},
             train_time_seconds=0.0,
             memory_mb=0.0,
@@ -286,7 +365,6 @@ def run_model_trainer(state: AgentState) -> dict:
 
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "")
-        is_imbalanced = profile.get("is_imbalanced", False)
         suggested_models = plan.get(
             "suggested_models", ["lightgbm", "xgboost", "random_forest"]
         )
@@ -309,36 +387,41 @@ def run_model_trainer(state: AgentState) -> dict:
         X = df.drop(columns=[target_col])
         y = df[target_col]
 
+        # Capture the RAW input schema (before any preprocessing) so the served
+        # model knows exactly what columns/types to expect at inference time.
+        feature_schema = [
+            {"name": str(c), "dtype": str(X[c].dtype)} for c in X.columns
+        ]
+
         # Encode target if classification
-        le = None
         if task_type == "classification" and y.dtype == object:
-            le = LabelEncoder()
-            y = le.fit_transform(y)
+            y = pd.Series(LabelEncoder().fit_transform(y), index=y.index)
 
-        # Drop any remaining non-numeric columns (shouldn't happen after FE, but safety net)
-        non_numeric = X.select_dtypes(exclude=[np.number]).columns.tolist()
-        if non_numeric:
-            X = X.drop(columns=non_numeric)
-            logger.warning(
-                "Dropped non-numeric columns before training: %s", non_numeric
-            )
+        y_arr = np.asarray(y)
 
-        feature_names = X.columns.tolist()
-        X_arr = X.values
-        y_arr = np.array(y)
-
-        # Train/test split
+        # Compute a real positive-class weight for imbalanced binary problems
+        # (replaces the old hardcoded 10). 1.0 = no reweighting.
+        scale_pos = 1.0
         if task_type == "classification":
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_arr, y_arr, test_size=0.2, random_state=42, stratify=y_arr
-            )
-        else:
-            X_train, X_test, y_train, y_test = train_test_split(
-                X_arr, y_arr, test_size=0.2, random_state=42
-            )
+            classes, counts = np.unique(y_arr, return_counts=True)
+            if len(classes) == 2:
+                neg, pos = counts.max(), counts.min()
+                scale_pos = round(float(neg) / float(pos), 3) if pos else 1.0
+
+        # Preprocessing (imputation/scaling/encoding) is fit INSIDE each model's
+        # Pipeline on the training fold only — never on the test set. No leakage.
+        preprocessor = _build_preprocessor(X)
+
+        # Train/test holdout split — DataFrames preserved so the ColumnTransformer
+        # can address columns by name.
+        stratify = y_arr if (task_type == "classification" and len(np.unique(y_arr)) > 1) else None
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y_arr, test_size=0.2, random_state=42, stratify=stratify
+        )
 
         logs.append(
             f"[{timestamp}] MODEL TRAINER — Train: {len(X_train)}, Test: {len(X_test)} rows"
+            + (f" | scale_pos_weight={scale_pos}" if scale_pos != 1.0 else "")
         )
 
         # Run all models in parallel
@@ -346,16 +429,14 @@ def run_model_trainer(state: AgentState) -> dict:
             tasks = [
                 _train_single_model(
                     model_name=m,
+                    preprocessor=preprocessor,
                     X_train=X_train,
                     X_test=X_test,
                     y_train=y_train,
                     y_test=y_test,
                     task_type=task_type,
-                    is_imbalanced=is_imbalanced,
+                    scale_pos=scale_pos,
                     provider=state["provider"],
-                    api_key=state["api_key"],
-                    model_llm_name=state["model_name"],
-                    feature_names=feature_names,
                 )
                 for m in suggested_models
             ]
@@ -363,6 +444,10 @@ def run_model_trainer(state: AgentState) -> dict:
 
         results_list = asyncio.run(_train_all())
         model_results = {name: result for name, result in results_list}
+
+        # Bounded sample of the HELD-OUT test set for SHAP (raw features → the
+        # winning Pipeline transforms it downstream). Explains on unseen data.
+        shap_sample = X_test.head(200).to_dict("records")
 
         # Log results
         for name, result in model_results.items():
@@ -374,8 +459,13 @@ def run_model_trainer(state: AgentState) -> dict:
                 metrics_str = ", ".join(
                     f"{k}={v}" for k, v in result["metrics"].items()
                 )
+                cv_str = (
+                    f" | CV {result['cv_metric']}={result['cv_mean']}±{result['cv_std']}"
+                    if result.get("cv_metric") and not result["cv_metric"].startswith("skipped")
+                    else ""
+                )
                 logs.append(
-                    f"[{timestamp}] MODEL TRAINER — {name.upper()}: {metrics_str} ({result['train_time_seconds']}s)"
+                    f"[{timestamp}] MODEL TRAINER — {name.upper()}: {metrics_str}{cv_str} ({result['train_time_seconds']}s)"
                 )
 
         # Log comparison to MLflow
@@ -397,6 +487,8 @@ def run_model_trainer(state: AgentState) -> dict:
 
         return {
             "model_results": model_results,
+            "feature_schema": feature_schema,
+            "shap_sample": shap_sample,
             "current_step": "evaluator",
             "logs": logs,
         }

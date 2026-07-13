@@ -140,7 +140,7 @@ class TestModelTrainer:
         """Model factory creates correct model type."""
         from agents.model_trainer import _make_model
 
-        model = _make_model("lightgbm", "classification", is_imbalanced=False)
+        model = _make_model("lightgbm", "classification", scale_pos=1.0)
         assert hasattr(model, "fit")
         assert hasattr(model, "predict_proba")
 
@@ -148,7 +148,7 @@ class TestModelTrainer:
         """Model factory creates regression model."""
         from agents.model_trainer import _make_model
 
-        model = _make_model("xgboost", "regression", is_imbalanced=False)
+        model = _make_model("xgboost", "regression", scale_pos=1.0)
         assert hasattr(model, "fit")
         assert hasattr(model, "predict")
 
@@ -158,7 +158,7 @@ class TestModelTrainer:
         import numpy as np
 
         model = _make_model(
-            "logistic_regression", "classification", is_imbalanced=False
+            "logistic_regression", "classification", scale_pos=1.0
         )
         X = np.random.randn(100, 5)
         y = np.random.choice([0, 1], 100)
@@ -175,7 +175,7 @@ class TestModelTrainer:
         from agents.model_trainer import _make_model, _compute_metrics
         import numpy as np
 
-        model = _make_model("linear_regression", "regression", is_imbalanced=False)
+        model = _make_model("linear_regression", "regression", scale_pos=1.0)
         X = np.random.randn(100, 5)
         y = np.random.randn(100)
         model.fit(X, y)

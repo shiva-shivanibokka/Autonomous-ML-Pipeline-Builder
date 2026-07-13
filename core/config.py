@@ -29,8 +29,11 @@ class Settings(BaseSettings):
     e2b_api_key: str = Field(default="", alias="E2B_API_KEY")
 
     # ── MLflow ────────────────────────────────────────────────────────────────
+    # Default to a local file store so runs never hang waiting on a tracking
+    # server that isn't up. Point this at http://<host> to use a real server
+    # (the docker-compose stack sets it to the bundled MLflow service).
     mlflow_tracking_uri: str = Field(
-        default="http://localhost:5001", alias="MLFLOW_TRACKING_URI"
+        default="file:./mlruns", alias="MLFLOW_TRACKING_URI"
     )
     mlflow_experiment_name: str = Field(
         default="autonomous-ml-pipeline", alias="MLFLOW_EXPERIMENT_NAME"

@@ -39,42 +39,75 @@ SENSITIVE_FEATURES = {
 }
 
 
-class EvaluatorDecision(BaseModel):
-    winner_model: str = Field(description="Name of the best model")
-    ranking: list[str] = Field(description="All model names ordered best to worst")
-    justification: str = Field(
-        description="2-3 sentence explanation of why this model wins"
-    )
-    primary_metric: str = Field(description="The metric that drove the decision")
-    bias_warnings: list[str] = Field(
-        default=[], description="Any bias concerns flagged"
-    )
+# Metrics where a LOWER value is better (everything else: higher is better).
+_LOWER_IS_BETTER = {"rmse", "mape"}
 
 
-SYSTEM_PROMPT = build_system_prompt(
-    role="a senior ML engineer who evaluates and compares model training results",
+def _select_winner(
+    model_results: dict[str, Any], primary_metric: str
+) -> tuple[str | None, list[str]]:
+    """
+    Deterministically rank models by the primary metric (no LLM in the loop).
+
+    Selection is pure argmax/argmin on a number — the LLM only narrates the
+    decision afterwards. Failed models are excluded. Ties fall back to the
+    leakage-free cross-validation mean.
+    """
+    valid = {
+        n: r
+        for n, r in model_results.items()
+        if not r.get("error") and r.get("model_object") is not None
+    }
+    if not valid:
+        return None, []
+
+    lower_better = primary_metric in _LOWER_IS_BETTER
+
+    def sort_key(name: str) -> tuple[float, float]:
+        r = valid[name]
+        metrics = r.get("metrics", {})
+        primary = metrics.get(primary_metric)
+        # Orient so that "bigger key = better" regardless of metric direction.
+        primary_key = (
+            (-float(primary) if lower_better else float(primary))
+            if primary is not None
+            else -1e18
+        )
+        return (primary_key, float(r.get("cv_mean", 0.0)))
+
+    ranking = sorted(valid, key=sort_key, reverse=True)
+    return ranking[0], ranking
+
+
+# The LLM writes a human-readable justification for the ALREADY-decided winner.
+JUSTIFICATION_PROMPT = build_system_prompt(
+    role="a senior ML engineer explaining a model selection decision",
     context=(
-        "Given a comparison table of models and their evaluation metrics, "
-        "select the best model for production deployment. "
-        "Consider: metric performance, training time, memory usage, and bias risk. "
-        "For classification: prefer AUC, then F1. "
-        "For regression: prefer RMSE (lower is better), then R². "
-        "Penalise models that failed (error field set). "
-        "Consider whether simpler models (Logistic Regression, Linear Regression) "
-        "perform within 2% of complex models — if so, recommend the simpler model "
-        "for production (interpretability and latency matter). "
+        "The winning model has ALREADY been chosen deterministically by the primary "
+        "metric. Your job is only to write a clear 2-3 sentence justification for a "
+        "stakeholder: reference the metric values and, where relevant, the trade-off "
+        "against training time or interpretability. Return JSON with a single key "
+        "'justification' (string)."
     ),
 )
 
 
+class _Justification(BaseModel):
+    justification: str = Field(description="2-3 sentence explanation")
+
+
 def _run_shap(
-    model: Any,
-    X_test: np.ndarray,
-    feature_names: list[str],
-    task_type: str,
+    pipeline: Any,
+    X_test: pd.DataFrame,
     output_dir: str,
 ) -> str | None:
-    """Run SHAP explainability on the winning model and save a summary plot."""
+    """
+    Run SHAP on the winning Pipeline over HELD-OUT test rows.
+
+    The pipeline's preprocessing step transforms the raw test features first, then
+    SHAP explains the model step on those transformed features — so the plot
+    reflects generalisation behaviour, not memorised training data.
+    """
     try:
         import shap
         import matplotlib
@@ -82,38 +115,40 @@ def _run_shap(
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
 
-        # Choose explainer type
-        if hasattr(model, "predict_proba") and hasattr(model, "feature_importances_"):
-            # Tree-based models
+        prep = pipeline.named_steps["prep"]
+        model = pipeline.named_steps["model"]
+        Xt = prep.transform(X_test)
+        if hasattr(Xt, "toarray"):  # sparse from OneHotEncoder
+            Xt = Xt.toarray()
+        feature_names = list(prep.get_feature_names_out())
+
+        if hasattr(model, "feature_importances_"):
+            # Tree-based models — exact, fast.
             explainer = shap.TreeExplainer(model)
-            shap_values = explainer.shap_values(
-                X_test[:200]
-            )  # Limit to 200 rows for speed
+            shap_values = explainer.shap_values(Xt[:200])
         else:
-            # Linear or neural models — use KernelExplainer with sample background
-            background = shap.sample(X_test, 50)
+            # Linear/neural — KernelExplainer with a small background sample.
+            background = shap.sample(Xt, min(50, len(Xt)))
             predict_fn = (
-                model.predict_proba
-                if hasattr(model, "predict_proba")
-                else model.predict
+                model.predict_proba if hasattr(model, "predict_proba") else model.predict
             )
             explainer = shap.KernelExplainer(predict_fn, background)
-            shap_values = explainer.shap_values(X_test[:50])
+            shap_values = explainer.shap_values(Xt[:50])
 
-        # Handle multi-class shap_values (list of arrays)
+        # Multi-class → take the positive/second class slice.
         if isinstance(shap_values, list):
             shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
 
-        # Summary plot
         plt.figure(figsize=(10, 6))
         shap.summary_plot(
             shap_values,
-            X_test[:200],
+            Xt[: len(shap_values)],
             feature_names=feature_names,
             plot_type="bar",
             show=False,
         )
         plt.tight_layout()
+        os.makedirs(output_dir, exist_ok=True)
         plot_path = os.path.join(output_dir, "shap_summary.png")
         plt.savefig(plot_path, dpi=150, bbox_inches="tight")
         plt.close()
@@ -168,135 +203,125 @@ def run_evaluator(state: AgentState) -> dict:
             "primary_metric", "auc" if task_type == "classification" else "rmse"
         )
 
-        # Build comparison table
+        # Build comparison table (includes leakage-free CV columns)
         comparison_table = []
         for name, result in model_results.items():
             row = {
                 "model": name,
                 **result.get("metrics", {}),
+                "cv_mean": result.get("cv_mean", 0.0),
+                "cv_std": result.get("cv_std", 0.0),
                 "train_time_s": result.get("train_time_seconds", 0),
                 "memory_mb": result.get("memory_mb", 0),
                 "failed": bool(result.get("error")),
             }
             comparison_table.append(row)
 
-        # Ask LLM to evaluate
-        llm = get_llm(
-            provider=state["provider"],
-            api_key=state["api_key"],
-            model=state["model_name"],
-        )
+        # ── Deterministic winner selection (no LLM decides the number) ──────────
+        winner_name, ranking = _select_winner(model_results, primary_metric)
+        if winner_name is None:
+            raise ValueError("No model trained successfully; cannot evaluate.")
 
-        table_str = "\n".join(
-            f"  {row['model']}: "
-            + ", ".join(f"{k}={v}" for k, v in row.items() if k != "model")
-            for row in comparison_table
-        )
-
-        user_prompt = (
-            f"Task type: {task_type}\n"
-            f"Primary metric: {primary_metric}\n\n"
-            f"Model results:\n{table_str}\n\n"
-            "Select the best model for production. "
-            "Return JSON with: winner_model, ranking, justification, primary_metric, bias_warnings."
-        )
-
-        response = llm.invoke(
-            [
-                SystemMessage(content=SYSTEM_PROMPT),
-                HumanMessage(content=user_prompt),
-            ]
-        )
-        raw = extract_content(response)
-        decision = safe_parse(raw, EvaluatorDecision)
-
-        if decision is None:
-            # Fallback: pick by primary metric
-            valid = {n: r for n, r in model_results.items() if not r.get("error")}
-            ascending = primary_metric in ("rmse", "mape")
-            winner_name = min(
-                valid,
-                key=lambda n: valid[n]["metrics"].get(
-                    primary_metric, float("inf") if ascending else -float("inf")
-                ),
-            )
-            decision = EvaluatorDecision(
-                winner_model=winner_name,
-                ranking=list(valid.keys()),
-                justification=f"Selected {winner_name} by {primary_metric} metric.",
-                primary_metric=primary_metric,
-                bias_warnings=[],
-            )
-
-        logs.append(f"[{timestamp}] EVALUATOR — Winner: {decision.winner_model}")
+        winner_result = model_results.get(winner_name, {})
+        winner_metric_val = winner_result.get("metrics", {}).get(primary_metric)
         logs.append(
-            f"[{timestamp}] EVALUATOR — Justification: {decision.justification}"
+            f"[{timestamp}] EVALUATOR — Winner: {winner_name} "
+            f"({primary_metric}={winner_metric_val})"
         )
 
-        # Run SHAP on winner
-        shap_plot_path = None
-        winner_result = model_results.get(decision.winner_model, {})
-        winner_model_obj = winner_result.get("model_object")
-
-        if winner_model_obj is not None:
-            logs.append(
-                f"[{timestamp}] EVALUATOR — Running SHAP explainability on {decision.winner_model}..."
+        # ── LLM writes the justification narrative only (non-fatal) ─────────────
+        justification = (
+            f"{winner_name} was selected as it achieved the best {primary_metric} "
+            f"({winner_metric_val}) among {len(ranking)} candidate models."
+        )
+        try:
+            llm = get_llm(
+                provider=state["provider"],
+                api_key=state["api_key"],
+                model=state["model_name"],
             )
+            table_str = "\n".join(
+                f"  {row['model']}: "
+                + ", ".join(f"{k}={v}" for k, v in row.items() if k != "model")
+                for row in comparison_table
+            )
+            resp = llm.invoke(
+                [
+                    SystemMessage(content=JUSTIFICATION_PROMPT),
+                    HumanMessage(
+                        content=(
+                            f"Task: {task_type}. Primary metric: {primary_metric}.\n"
+                            f"Chosen winner: {winner_name}.\n\n"
+                            f"Model results:\n{table_str}\n\n"
+                            "Return JSON: {\"justification\": \"...\"}"
+                        )
+                    ),
+                ]
+            )
+            parsed = safe_parse(extract_content(resp), _Justification)
+            if parsed and parsed.justification.strip():
+                justification = parsed.justification.strip()
+        except Exception as exc:
+            logger.warning("Justification LLM call failed (non-fatal): %s", exc)
+
+        logs.append(f"[{timestamp}] EVALUATOR — Justification: {justification}")
+
+        # ── SHAP on held-out test rows + persist the winning pipeline ──────────
+        shap_plot_path = ""
+        bias_warnings: list[str] = []
+        winner_pipe = winner_result.get("model_object")
+        out_dir = state.get("output_dir", "outputs")
+
+        if winner_pipe is not None:
+            os.makedirs(out_dir, exist_ok=True)
+
+            # Persist the full pipeline (prep + model) so the generated API is runnable.
             try:
-                csv_path = feature_result.get("transformed_csv_path") or state.get(
-                    "csv_path", ""
-                )
-                df = pd.read_csv(csv_path)
-                X = df.drop(columns=[target_col])
-                non_numeric = X.select_dtypes(exclude=[np.number]).columns.tolist()
-                if non_numeric:
-                    X = X.drop(columns=non_numeric)
-                feature_names = X.columns.tolist()
-                X_arr = X.values
+                import joblib
+                import json
 
-                with tempfile.TemporaryDirectory() as tmpdir:
-                    shap_plot_path = _run_shap(
-                        model=winner_model_obj,
-                        X_test=X_arr,
-                        feature_names=feature_names,
-                        task_type=task_type,
-                        output_dir=tmpdir,
+                joblib.dump(winner_pipe, os.path.join(out_dir, "model.pkl"))
+                with open(
+                    os.path.join(out_dir, "feature_schema.json"), "w", encoding="utf-8"
+                ) as f:
+                    json.dump(state.get("feature_schema", []), f, indent=2)
+                logs.append(
+                    f"[{timestamp}] EVALUATOR — Saved model.pkl + feature_schema.json"
+                )
+            except Exception as exc:
+                logger.warning("Model persistence failed (non-fatal): %s", exc)
+
+            # SHAP over the held-out test sample.
+            sample = state.get("shap_sample") or []
+            if sample:
+                logs.append(
+                    f"[{timestamp}] EVALUATOR — Running SHAP on {winner_name} (test set)..."
+                )
+                try:
+                    X_test = pd.DataFrame(sample)
+                    cols = [f["name"] for f in state.get("feature_schema", [])]
+                    keep = [c for c in cols if c in X_test.columns]
+                    if keep:
+                        X_test = X_test[keep]
+                    shap_plot_path = _run_shap(winner_pipe, X_test, out_dir) or ""
+
+                    bias_warnings = _check_bias(
+                        X_test, target_col, winner_name, winner_pipe, keep
                     )
-                    # Move to permanent per-run location
-                    if shap_plot_path:
-                        import shutil
-
-                        out_dir = state.get("output_dir", "outputs")
-                        os.makedirs(out_dir, exist_ok=True)
-                        perm_path = os.path.join(out_dir, "shap_summary.png")
-                        shutil.copy(shap_plot_path, perm_path)
-                        shap_plot_path = perm_path
-
-                # Bias check
-                bias_warnings = _check_bias(
-                    df,
-                    target_col,
-                    decision.winner_model,
-                    winner_model_obj,
-                    feature_names,
-                )
-                if bias_warnings:
-                    decision.bias_warnings.extend(bias_warnings)
                     for w in bias_warnings:
                         logs.append(f"[{timestamp}] EVALUATOR — BIAS WARNING: {w}")
-
-            except Exception as exc:
-                logger.warning("Post-evaluation steps failed: %s", exc)
+                except Exception as exc:
+                    logger.warning("SHAP/bias step failed (non-fatal): %s", exc)
 
         logs.append(f"[{timestamp}] EVALUATOR — Done.")
 
         evaluation_result: EvaluationResult = {
-            "winner_model": decision.winner_model,
-            "ranking": decision.ranking,
-            "justification": decision.justification,
-            "primary_metric": decision.primary_metric,
-            "shap_plot_path": shap_plot_path or "",
-            "bias_warnings": decision.bias_warnings,
+            "winner_model": winner_name,
+            "ranking": ranking,
+            "justification": justification,
+            "primary_metric": primary_metric,
+            "shap_plot_path": shap_plot_path,
+            "bias_warnings": bias_warnings,
             "comparison_table": comparison_table,
         }
 
