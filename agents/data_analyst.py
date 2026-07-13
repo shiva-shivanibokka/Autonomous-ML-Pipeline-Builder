@@ -95,8 +95,10 @@ def _detect_imbalance(df: pd.DataFrame, target_col: str) -> tuple[bool, float | 
     counts = df[target_col].value_counts()
     if len(counts) < 2:
         return False, None
-    ratio = counts.min() / counts.max()
-    return ratio < 0.2, round(ratio, 4)
+    ratio = float(counts.min()) / float(counts.max())
+    # Return native Python types: numpy scalars aren't JSON-serialisable and
+    # `np.bool_(True) is True` is False, which breaks identity checks downstream.
+    return bool(ratio < 0.2), round(ratio, 4)
 
 
 def run_data_analyst(state: AgentState) -> dict:
