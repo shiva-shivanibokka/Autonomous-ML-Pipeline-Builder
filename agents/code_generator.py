@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from agents.state import AgentState, DeploymentArtifacts
 from core.llm_utils import build_system_prompt, extract_content, strip_fences
 from core.providers import get_codegen_llm
+from core.rag import retrieve_context
 
 logger = logging.getLogger(__name__)
 
@@ -85,8 +86,21 @@ def run_code_generator(state: AgentState) -> dict:
             api_key=state["api_key"],
         )
 
+        # Ground the generated pipeline in serving/model-selection best-practices (RAG).
+        grounding = retrieve_context(
+            f"production ML pipeline and serving for a {task_type} model; "
+            f"pipeline serialization, model selection, reproducibility",
+            k=2,
+        )
+        grounding_block = (
+            f"Relevant best-practices — apply where appropriate:\n\n{grounding}\n\n"
+            if grounding
+            else ""
+        )
+
         user_prompt = (
-            f"Write a complete production ML pipeline for the following:\n\n"
+            grounding_block
+            + f"Write a complete production ML pipeline for the following:\n\n"
             f"Task: {task_type}\n"
             f"Target column: '{target_col}'\n"
             f"Winning model: {winner}\n"

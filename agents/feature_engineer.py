@@ -20,6 +20,7 @@ from langchain_core.messages import HumanMessage, SystemMessage
 from agents.state import AgentState, FeatureEngineeringResult
 from core.llm_utils import build_system_prompt, extract_content, strip_fences
 from core.providers import get_codegen_llm
+from core.rag import retrieve_context
 
 logger = logging.getLogger(__name__)
 
@@ -60,8 +61,22 @@ def _build_feature_engineering_prompt(state: AgentState) -> str:
     profile = state.get("dataset_profile") or {}
     plan = state.get("_orchestrator_plan") or {}
 
+    # Retrieve grounding from the ML-knowledge base (RAG).
+    query = (
+        f"feature engineering preprocessing for {profile.get('task_type', 'classification')} "
+        f"with categorical columns, missing values, datetime features; avoid data leakage; "
+        f"class imbalance {profile.get('is_imbalanced', False)}"
+    )
+    grounding = retrieve_context(query, k=3)
+    grounding_block = (
+        f"Relevant best-practices from the knowledge base — follow these:\n\n{grounding}\n\n"
+        if grounding
+        else ""
+    )
+
     return (
-        f"Dataset profile:\n"
+        grounding_block
+        + f"Dataset profile:\n"
         f"  - Target column: '{profile.get('target_column', 'unknown')}'\n"
         f"  - Task type: {profile.get('task_type', 'classification')}\n"
         f"  - Numeric columns: {profile.get('numeric_cols', [])}\n"
@@ -97,6 +112,7 @@ def run_feature_engineer(state: AgentState) -> dict:
 
     timestamp = datetime.now().strftime("%H:%M:%S")
     logs = list(state.get("logs", []))
+    logs.append(f"[{timestamp}] FEATURE ENGINEER — Retrieving ML best-practices (RAG)...")
     logs.append(f"[{timestamp}] FEATURE ENGINEER — Generating preprocessing code...")
 
     try:
