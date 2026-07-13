@@ -5,6 +5,7 @@ api.schemas — Pydantic v2 request and response models for the FastAPI backend.
 from __future__ import annotations
 
 from typing import Any, Optional
+
 from pydantic import BaseModel, Field
 
 

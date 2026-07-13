@@ -5,7 +5,6 @@ These prove the Phase A hardening: callers cannot make the pipeline read
 arbitrary server files, and artifacts are scoped per run.
 """
 
-import io
 
 import pandas as pd
 import pytest

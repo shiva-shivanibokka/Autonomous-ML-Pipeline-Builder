@@ -6,14 +6,14 @@ repos across this portfolio. One place to add a new provider; every agent
 module imports from here.
 
 Supports:
-  - Anthropic Claude  (claude-3-5-sonnet, claude-3-5-haiku, claude-3-opus)
-  - OpenAI GPT        (gpt-4o, gpt-4o-mini, gpt-3.5-turbo)
-  - Groq              (llama-3.3-70b, llama-3.1-8b, mixtral-8x7b)
+  - Anthropic Claude  (claude-sonnet-5, claude-opus-4-8, claude-haiku-4-5)
+  - OpenAI GPT        (gpt-4o, gpt-4o-mini)
+  - Groq              (llama-3.3-70b, llama-3.1-8b)
 
 Usage:
     from core.providers import get_llm, PROVIDER_MODELS
 
-    llm = get_llm("anthropic", api_key="sk-ant-...", model="claude-3-5-haiku-20241022")
+    llm = get_llm("anthropic", api_key="sk-ant-...", model="claude-haiku-4-5-20251001")
     response = llm.invoke("Hello")
 """
 
@@ -27,32 +27,30 @@ from langchain_openai import ChatOpenAI
 # ── Provider model catalogue ───────────────────────────────────────────────────
 PROVIDER_MODELS: dict[str, list[str]] = {
     "anthropic": [
-        "claude-3-5-sonnet-20241022",
-        "claude-3-5-haiku-20241022",
-        "claude-3-opus-20240229",
+        "claude-sonnet-5",
+        "claude-opus-4-8",
+        "claude-haiku-4-5-20251001",
     ],
     "openai": [
         "gpt-4o",
         "gpt-4o-mini",
-        "gpt-3.5-turbo",
     ],
     "groq": [
         "llama-3.3-70b-versatile",
         "llama-3.1-8b-instant",
-        "mixtral-8x7b-32768",
     ],
 }
 
 # Default model for each provider — used when no model is specified
 PROVIDER_DEFAULTS: dict[str, str] = {
-    "anthropic": "claude-3-5-sonnet-20241022",
+    "anthropic": "claude-sonnet-5",
     "openai": "gpt-4o",
     "groq": "llama-3.3-70b-versatile",
 }
 
 # Models that are cost-efficient for high-volume code generation tasks
 CODEGEN_MODELS: dict[str, str] = {
-    "anthropic": "claude-3-5-haiku-20241022",
+    "anthropic": "claude-haiku-4-5-20251001",
     "openai": "gpt-4o-mini",
     "groq": "llama-3.1-8b-instant",
 }

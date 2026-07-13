@@ -59,7 +59,6 @@ SYSTEM_PROMPT = build_system_prompt(
 
 def _build_feature_engineering_prompt(state: AgentState) -> str:
     profile = state.get("dataset_profile") or {}
-    plan = state.get("_orchestrator_plan") or {}
 
     # Retrieve grounding from the ML-knowledge base (RAG).
     query = (

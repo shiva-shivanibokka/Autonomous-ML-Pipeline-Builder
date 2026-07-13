@@ -11,7 +11,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
 
 def _make_state(tmp_path: Path, n=400) -> dict:
@@ -58,8 +57,9 @@ def _make_state(tmp_path: Path, n=400) -> dict:
 
 
 def test_trainer_produces_fitted_pipelines_with_cv(tmp_path):
-    from agents.model_trainer import run_model_trainer
     from sklearn.pipeline import Pipeline
+
+    from agents.model_trainer import run_model_trainer
 
     state = _make_state(tmp_path)
     out = run_model_trainer(state)
@@ -80,9 +80,10 @@ def test_trainer_produces_fitted_pipelines_with_cv(tmp_path):
 
 
 def test_evaluator_selects_deterministically_and_persists_runnable_model(tmp_path):
-    from agents.model_trainer import run_model_trainer
-    from agents.evaluator import run_evaluator, _select_winner
     import joblib
+
+    from agents.evaluator import _select_winner, run_evaluator
+    from agents.model_trainer import run_model_trainer
 
     state = _make_state(tmp_path)
     state.update(run_model_trainer(state))

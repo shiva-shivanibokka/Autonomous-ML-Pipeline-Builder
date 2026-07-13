@@ -4,13 +4,11 @@ tests.test_agents — Unit tests for individual agent nodes.
 Tests use synthetic data and mock LLM calls to run fast without API keys.
 """
 
-import os
-import tempfile
-import pytest
-import pandas as pd
-import numpy as np
 from unittest.mock import MagicMock, patch
 
+import numpy as np
+import pandas as pd
+import pytest
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 
@@ -154,8 +152,9 @@ class TestModelTrainer:
 
     def test_compute_metrics_classification(self):
         """Metric computation returns expected keys."""
-        from agents.model_trainer import _make_model, _compute_metrics
         import numpy as np
+
+        from agents.model_trainer import _compute_metrics, _make_model
 
         model = _make_model(
             "logistic_regression", "classification", scale_pos=1.0
@@ -172,8 +171,9 @@ class TestModelTrainer:
 
     def test_compute_metrics_regression(self):
         """Regression metric computation returns expected keys."""
-        from agents.model_trainer import _make_model, _compute_metrics
         import numpy as np
+
+        from agents.model_trainer import _compute_metrics, _make_model
 
         model = _make_model("linear_regression", "regression", scale_pos=1.0)
         X = np.random.randn(100, 5)
@@ -224,8 +224,9 @@ class TestLLMUtils:
 
     def test_parse_structured_output_valid(self):
         """parse_structured_output returns typed Pydantic model."""
-        from core.llm_utils import parse_structured_output
         from pydantic import BaseModel
+
+        from core.llm_utils import parse_structured_output
 
         class MySchema(BaseModel):
             name: str
@@ -238,8 +239,9 @@ class TestLLMUtils:
 
     def test_parse_structured_output_with_fences(self):
         """parse_structured_output handles fenced JSON."""
-        from core.llm_utils import parse_structured_output
         from pydantic import BaseModel
+
+        from core.llm_utils import parse_structured_output
 
         class MySchema(BaseModel):
             value: int

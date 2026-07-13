@@ -10,18 +10,16 @@ from __future__ import annotations
 
 import logging
 import os
-import tempfile
 from datetime import datetime
 from typing import Any
 
-import numpy as np
 import pandas as pd
 from langchain_core.messages import HumanMessage, SystemMessage
+from pydantic import BaseModel, Field
 
 from agents.state import AgentState, EvaluationResult
 from core.llm_utils import build_system_prompt, extract_content, safe_parse
 from core.providers import get_llm
-from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
 
@@ -109,8 +107,8 @@ def _run_shap(
     reflects generalisation behaviour, not memorised training data.
     """
     try:
-        import shap
         import matplotlib
+        import shap
 
         matplotlib.use("Agg")
         import matplotlib.pyplot as plt
@@ -195,7 +193,6 @@ def run_evaluator(state: AgentState) -> dict:
         model_results = state.get("model_results", {})
         profile = state.get("dataset_profile") or {}
         plan = state.get("_orchestrator_plan") or {}
-        feature_result = state.get("feature_result") or {}
 
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "")
@@ -277,8 +274,9 @@ def run_evaluator(state: AgentState) -> dict:
 
             # Persist the full pipeline (prep + model) so the generated API is runnable.
             try:
-                import joblib
                 import json
+
+                import joblib
 
                 joblib.dump(winner_pipe, os.path.join(out_dir, "model.pkl"))
                 with open(

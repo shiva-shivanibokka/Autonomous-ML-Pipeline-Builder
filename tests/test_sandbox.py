@@ -2,10 +2,8 @@
 tests.test_sandbox — Tests for E2B sandbox and subprocess execution.
 """
 
-import pytest
+
 import pandas as pd
-import numpy as np
-from unittest.mock import patch
 
 
 class TestSubprocessExecution:

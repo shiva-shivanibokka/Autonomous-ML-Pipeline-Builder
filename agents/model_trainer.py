@@ -20,35 +20,33 @@ import logging
 import time
 import tracemalloc
 from datetime import datetime
-from pathlib import Path
 from typing import Any
 
 import numpy as np
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
+from sklearn.metrics import (
+    accuracy_score,
+    f1_score,
+    mean_absolute_percentage_error,
+    mean_squared_error,
+    precision_score,
+    r2_score,
+    recall_score,
+    roc_auc_score,
+)
 from sklearn.model_selection import (
-    train_test_split,
-    cross_val_score,
-    StratifiedKFold,
     KFold,
+    StratifiedKFold,
+    cross_val_score,
+    train_test_split,
 )
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import LabelEncoder, OneHotEncoder, StandardScaler
-from sklearn.metrics import (
-    roc_auc_score,
-    f1_score,
-    precision_score,
-    recall_score,
-    mean_squared_error,
-    r2_score,
-    mean_absolute_percentage_error,
-    accuracy_score,
-)
 
 from agents.state import AgentState, ModelResult
-from core.mlops.tracking import log_training_run, log_comparison_table
-from core.config import settings
+from core.mlops.tracking import log_comparison_table, log_training_run
 
 logger = logging.getLogger(__name__)
 

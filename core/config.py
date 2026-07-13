@@ -9,7 +9,6 @@ Usage:
     api_key = settings.anthropic_api_key
 """
 
-import os
 from functools import lru_cache
 
 from dotenv import load_dotenv
@@ -46,9 +45,7 @@ class Settings(BaseSettings):
 
     # ── Pipeline defaults ─────────────────────────────────────────────────────
     default_provider: str = Field(default="anthropic", alias="DEFAULT_PROVIDER")
-    default_model: str = Field(
-        default="claude-3-5-sonnet-20241022", alias="DEFAULT_MODEL"
-    )
+    default_model: str = Field(default="claude-sonnet-5", alias="DEFAULT_MODEL")
     max_correction_retries: int = Field(default=3, alias="MAX_CORRECTION_RETRIES")
     sandbox_timeout_seconds: int = Field(default=120, alias="SANDBOX_TIMEOUT_SECONDS")
 

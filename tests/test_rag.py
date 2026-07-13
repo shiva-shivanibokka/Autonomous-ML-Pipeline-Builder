@@ -6,7 +6,7 @@ offline default use. Verifies retrieval actually surfaces the right doc — the
 "evaluate retrieval quality" part of a real RAG system, not just a chat wrapper.
 """
 
-from core.rag.retriever import _build, _KNOWLEDGE_DIR
+from core.rag.retriever import _KNOWLEDGE_DIR, _build
 
 
 def test_knowledge_base_loads_docs():

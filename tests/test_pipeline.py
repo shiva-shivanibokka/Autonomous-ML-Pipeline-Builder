@@ -5,7 +5,6 @@ These tests validate graph construction and state flow without making
 real LLM calls (all LLM calls are mocked).
 """
 
-import pytest
 from unittest.mock import MagicMock, patch
 
 
@@ -22,8 +21,7 @@ class TestGraph:
         from pipeline.graph import build_graph
 
         graph = build_graph()
-        # LangGraph compiled graphs expose their nodes
-        node_names = set(graph.nodes.keys()) if hasattr(graph, "nodes") else set()
+        node_names = set(graph.get_graph().nodes.keys())
         expected = {
             "orchestrator",
             "data_analyst",
@@ -33,8 +31,8 @@ class TestGraph:
             "code_generator",
             "deployment_agent",
         }
-        # Check at least some nodes are present
-        assert len(node_names) > 0 or True  # Graph compiled successfully
+        # Every expected agent must be a real node in the compiled graph.
+        assert expected.issubset(node_names), f"missing nodes: {expected - node_names}"
 
     def test_initial_state_construction(self, tmp_path):
         """build_initial_state creates valid AgentState."""
@@ -104,6 +102,7 @@ class TestSandboxExecutor:
         with patch("sandbox.executor.settings") as mock_settings:
             mock_settings.execution_backend = "subprocess"
             mock_settings.e2b_api_key = ""
+            mock_settings.allow_local_exec = True
             mock_settings.sandbox_timeout_seconds = 30
 
             result = execute_with_retry(
@@ -113,5 +112,7 @@ class TestSandboxExecutor:
                 max_retries=2,
             )
 
-        # LLM should have been called to fix the code
+        # LLM was called to fix the code, and the corrected code then succeeded.
         assert mock_llm.invoke.called
+        assert result["success"] is True
+        assert result["attempts"] >= 2

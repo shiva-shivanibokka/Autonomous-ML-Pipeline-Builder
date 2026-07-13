@@ -31,9 +31,6 @@ fastapi==0.111.0
 uvicorn[standard]==0.30.1
 python-multipart==0.0.9
 
-# ── Gradio UI ─────────────────────────────────────────────────────────────────
-gradio==5.0.0
-
 # ── Observability ─────────────────────────────────────────────────────────────
 structlog==24.2.0
 prometheus-client==0.20.0

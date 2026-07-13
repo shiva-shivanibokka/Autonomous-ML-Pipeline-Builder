@@ -28,7 +28,7 @@ from typing import Any
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from core.config import settings
-from core.llm_utils import strip_fences, extract_content
+from core.llm_utils import extract_content, strip_fences
 
 logger = logging.getLogger(__name__)
 
