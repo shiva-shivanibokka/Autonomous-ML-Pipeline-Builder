@@ -6,7 +6,6 @@ lightgbm==4.3.0
 xgboost==2.0.3
 shap==0.44.0
 matplotlib==3.8.4
-seaborn==0.13.2
 joblib==1.4.2
 
 # ── LLM / Agent stack ─────────────────────────────────────────────────────────
@@ -21,7 +20,12 @@ pydantic==2.7.1
 pydantic-settings==2.3.0
 
 # ── E2B sandbox ───────────────────────────────────────────────────────────────
-e2b-code-interpreter==0.0.10
+# v2, not v0. sandbox/executor.py calls the v1+ API — Sandbox, run_code(),
+# .commands, .files, .kill(). The old 0.0.10 pin is yanked on PyPI and exposed
+# a different surface entirely (CodeInterpreter, exec_cell(), .process,
+# .filesystem), so the E2B backend — the only one production allows — could
+# not have worked. Nothing caught it because CI runs the subprocess backend.
+e2b-code-interpreter==2.9.1
 
 # ── MLflow ────────────────────────────────────────────────────────────────────
 mlflow==2.13.0
@@ -36,7 +40,7 @@ structlog==24.2.0
 prometheus-client==0.20.0
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
+# seaborn, plotly, pyyaml and requests used to be pinned here with zero import
+# sites anywhere in the codebase — build time and image size for nothing. The
+# ones MLflow needs it declares itself.
 python-dotenv==1.0.1
-pyyaml==6.0.1
-plotly==5.22.0
-requests==2.32.3

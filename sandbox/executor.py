@@ -9,18 +9,22 @@ The self-correction loop:
 
 E2B gives us a real isolated Python environment where we can:
   - Install packages (pip install ...)
-  - Run arbitrary code safely
+  - Run generated code without it touching this host
   - Upload CSV files
   - Download outputs (transformed CSVs, plots)
 
-Falls back to subprocess if E2B_API_KEY is not set (local dev / HF Spaces fallback).
+Falls back to a local subprocess if E2B_API_KEY is not set. That runs the
+generated code on this host, so it is gated behind ALLOW_LOCAL_EXEC and is for
+local development only.
 """
 
 from __future__ import annotations
 
 import logging
 import os
+import re
 import subprocess
+import sys
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -65,13 +69,31 @@ def _ask_llm_to_fix(code: str, error: str, llm: Any) -> str:
 # ── E2B execution ─────────────────────────────────────────────────────────────
 
 
+def _format_execution_error(err: Any) -> str:
+    """
+    Render an E2B ExecutionError as text.
+
+    `Execution.error` is a single object or None — not a list. This used to be
+    iterated as `for e in (execution.error or [])`, which is empty-and-harmless
+    when nothing went wrong and a TypeError the moment something did: the one
+    path the self-correction loop exists to handle was the one that crashed.
+    """
+    if not err:
+        return ""
+    name = getattr(err, "name", "") or ""
+    value = getattr(err, "value", "") or ""
+    traceback = getattr(err, "traceback", "") or ""
+    headline = ": ".join(p for p in (str(name), str(value)) if p)
+    return f"{headline}\n{traceback}".strip() if traceback else (headline or str(err))
+
+
 def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
     """Execute code in an E2B cloud sandbox."""
     try:
         from e2b_code_interpreter import Sandbox  # type: ignore
     except ImportError:
         raise RuntimeError(
-            "e2b_code_interpreter not installed. Run: pip install e2b-code-interpreter"
+            "e2b-code-interpreter not installed. Run: pip install -r requirements.txt"
         )
 
     sbx = Sandbox(api_key=settings.e2b_api_key, timeout=timeout)
@@ -91,7 +113,7 @@ def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
         execution = sbx.run_code(code)
         stdout = "\n".join(str(o) for o in execution.logs.stdout)
         stderr = "\n".join(str(e) for e in execution.logs.stderr)
-        error = "\n".join(str(e) for e in (execution.error or []))
+        error = _format_execution_error(execution.error)
 
         # Try to download output CSV
         output_csv_path = ""
@@ -102,8 +124,11 @@ def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
             ) as f:
                 f.write(content if isinstance(content, bytes) else content.encode())
                 output_csv_path = f.name
-        except Exception:
-            pass
+        except Exception as exc:
+            # Not an error on its own: plenty of generated scripts legitimately
+            # write nothing. Log it, because when the script *was* supposed to
+            # emit a CSV this is the only place that would say why.
+            logger.info("no processed.csv returned from the sandbox: %s", exc)
 
         failed = bool(error) or bool(stderr and "Error" in stderr)
         return {
@@ -120,15 +145,47 @@ def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
 # ── Subprocess fallback ───────────────────────────────────────────────────────
 
 
+def _rewrite_path_constant(code: str, name: str, value: str) -> str:
+    """
+    Point a generated script's path constant at a real local file.
+
+    Matched by regex rather than by an exact string. This used to be
+    `code.replace("INPUT_CSV_PATH = '/data/input.csv'", ...)`, which missed the
+    moment the model wrote double quotes or spaced the assignment differently.
+    The substitution then silently did nothing, the script went looking for
+    /data/input.csv on the host, and the self-correction loop spent three LLM
+    calls trying to fix a bug that was ours.
+    """
+    pattern = re.compile(rf"^{re.escape(name)}\s*=\s*.+$", re.MULTILINE)
+    replacement = f"{name} = {value!r}"
+    new_code, n = pattern.subn(lambda _: replacement, code, count=1)
+    if n == 0:
+        # The script never declared it — prepend so the name at least exists.
+        return f"{replacement}\n{code}"
+    return new_code
+
+
+def _output_csv_for(csv_path: str) -> str:
+    """
+    Where a generated script should write its processed CSV.
+
+    Derived with pathlib rather than `csv_path.replace(".csv", "_processed.csv")`,
+    which rewrote every occurrence and so mangled any path with ".csv" in a
+    parent directory. Empty input is legitimate — some generated scripts take no
+    CSV at all — and must not raise.
+    """
+    if not csv_path:
+        return ""
+    p = Path(csv_path)
+    return str(p.with_name(f"{p.stem}_processed{p.suffix or '.csv'}"))
+
+
 def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
     """Execute code in a local subprocess with timeout (fallback for local dev)."""
-    # Inject the CSV path into the code
-    code_with_path = code.replace(
-        "INPUT_CSV_PATH = '/data/input.csv'",
-        f"INPUT_CSV_PATH = {repr(csv_path)}",
-    ).replace(
-        "OUTPUT_CSV_PATH = '/data/processed.csv'",
-        f"OUTPUT_CSV_PATH = {repr(csv_path.replace('.csv', '_processed.csv'))}",
+    output_csv = _output_csv_for(csv_path)
+    code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", csv_path)
+    code_with_path = _rewrite_path_constant(
+        code_with_path, "OUTPUT_CSV_PATH", output_csv
     )
 
     with tempfile.NamedTemporaryFile(
@@ -139,19 +196,23 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
 
     try:
         result = subprocess.run(
-            ["python", script_path],
+            # sys.executable, not "python": inside a venv, a container, or on a
+            # Linux box where only python3 is on PATH, "python" is either the
+            # wrong interpreter or missing entirely.
+            [sys.executable, script_path],
             capture_output=True,
             text=True,
             timeout=timeout,
         )
         success = result.returncode == 0
-        output_csv = csv_path.replace(".csv", "_processed.csv")
         return {
             "success": success,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "error_text": result.stderr if not success else "",
-            "output_csv_path": output_csv if Path(output_csv).exists() else csv_path,
+            "output_csv_path": (
+                output_csv if output_csv and Path(output_csv).exists() else csv_path
+            ),
         }
     except subprocess.TimeoutExpired:
         return {
