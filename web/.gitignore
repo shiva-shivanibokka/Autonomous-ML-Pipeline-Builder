@@ -32,6 +32,9 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but the example must ship, or the README's setup step
+# `cp .env.local.example .env.local` fails on a fresh clone.
+!.env*.example
 
 # vercel
 .vercel

@@ -5,7 +5,7 @@ import ControlPanel, { type RunParams } from "@/components/ControlPanel";
 import AgentRail, { type AgentState, type RailAgent } from "@/components/AgentRail";
 import LogConsole from "@/components/LogConsole";
 import ResultsPanel from "@/components/ResultsPanel";
-import { getLogs, getResult, getStatus, runPipeline } from "@/lib/api";
+import { API_BASE, getLogs, getResult, getStatus, runPipeline } from "@/lib/api";
 import { AGENTS, type ResultResponse, type RunStatus } from "@/lib/types";
 
 function deriveAgents(currentStep: string, status: RunStatus): RailAgent[] {
@@ -42,10 +42,18 @@ export default function Home() {
 
   useEffect(() => stopPolling, [stopPolling]);
 
+  // One dropped poll means nothing; a run of them means the backend is gone.
+  // Swallowing every failure silently left the UI spinning "running" forever
+  // with no clue that nothing was listening.
+  const consecutiveFailures = useRef(0);
+  const POLL_FAILURES_BEFORE_GIVING_UP = 8; // ~10s at the 1300ms interval
+
   const poll = useCallback(
     async (id: string) => {
       try {
         const [s, l] = await Promise.all([getStatus(id), getLogs(id, 0)]);
+        consecutiveFailures.current = 0;
+        setRunError("");
         setStatus(s.status);
         setCurrentStep(s.current_step || "orchestrator");
         setLogs(l.logs);
@@ -57,8 +65,16 @@ export default function Home() {
             /* result unavailable on a hard failure — logs still show why */
           }
         }
-      } catch {
-        /* transient poll error — keep the interval alive */
+      } catch (e) {
+        consecutiveFailures.current += 1;
+        if (consecutiveFailures.current >= POLL_FAILURES_BEFORE_GIVING_UP) {
+          stopPolling();
+          setStatus("failed");
+          setRunError(
+            `Lost contact with the backend at ${API_BASE}. ` +
+              (e instanceof Error ? e.message : "The run may still be going."),
+          );
+        }
       }
     },
     [stopPolling],
@@ -70,6 +86,7 @@ export default function Home() {
     setLogs([]);
     setStatus("pending");
     setCurrentStep("orchestrator");
+    consecutiveFailures.current = 0;
     try {
       const { pipeline_id } = await runPipeline(params);
       setPipelineId(pipeline_id);
@@ -98,7 +115,9 @@ export default function Home() {
           </span>
         </div>
         <a
-          href="https://github.com"
+          href="https://github.com/shiva-shivanibokka/Autonomous-ML-Pipeline-Builder"
+          target="_blank"
+          rel="noopener noreferrer"
           className="mono"
           style={{ color: "var(--muted)", fontSize: 12.5, textDecoration: "none" }}
         >
