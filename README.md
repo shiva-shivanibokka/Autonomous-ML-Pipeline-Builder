@@ -10,7 +10,7 @@
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
 > - **Hardest problem solved:** eliminating train/test **data leakage** across the whole flow (preprocessing is a scikit-learn `Pipeline` fit on the training fold only) *and* shipping a **runnable** artifact — the full pipeline serializes to `model.pkl`, so the generated FastAPI service predicts on raw input with zero training/serving skew.
-> - **Production concerns are addressed, not gestured at:** 45 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), and a Cloud Run + Vercel deployment path with a documented runbook.
+> - **Production concerns are addressed, not gestured at:** 60 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), and a Cloud Run + Vercel deployment path with a documented runbook.
 
 A LangGraph crew of seven agents plans the approach, profiles the data, engineers leakage-safe features, trains and cross-validates several models in parallel, explains the winner with SHAP, and emits a runnable FastAPI + Docker inference bundle. A Next.js console streams every agent's work in real time.
 
@@ -86,9 +86,9 @@ Real capabilities exercised in this repo (mapped to how they're usually named), 
 | **System design & architecture** | Two ADRs documenting the split and the leakage fix (`docs/adr/`) |
 | **Observability & monitoring** | Structured JSON logging (structlog), health check, Prometheus `/metrics` |
 | **Application security** | Server-issued upload IDs (no arbitrary file read), sandboxed execution, no stored keys, CORS allowlist, fail-loud prod boot |
-| **Containerization & CI/CD** | Non-root Dockerfile, GitHub Actions (lint + test + frontend build) |
+| **Containerization & CI/CD** | Non-root Dockerfile built in CI, GitHub Actions (lint + test + image build + frontend build) |
 | **Cloud-native deployment (GCP Cloud Run · Vercel)** | Deploy script + runbook (`deploy/`) — configured, not yet live |
-| **Automated testing** | 45 pytest tests incl. security, ML-correctness, and RAG-quality checks (`tests/`) |
+| **Automated testing** | 60 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
 | **Frontend engineering** | Next.js (App Router) + TypeScript console with live streaming (`web/`) |
 
 ## Tech stack
@@ -154,11 +154,11 @@ curl -O http://localhost:8000/pipeline/<pipeline_id>/artifacts/model.pkl
 
 ```bash
 pip install -r requirements-dev.txt
-ALLOW_LOCAL_EXEC=true pytest -q          # 45 tests
+ALLOW_LOCAL_EXEC=true pytest -q          # 60 tests (1 skips without the E2B extra)
 ruff check .                             # lint
 ```
 
-CI runs the same lint + tests (with coverage) plus the frontend build on every push and PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Coverage spans the API security contract (arbitrary-path rejection, key redaction), the leakage-safe training + persistence path, deterministic model selection, RAG retrieval quality, and the run store.
+CI runs the same lint + tests (with coverage), builds the production Docker image, and builds the frontend on every push and PR ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)). Coverage spans the API security contract (arbitrary-path rejection, key redaction), the leakage-safe training + persistence path, deterministic model selection, RAG retrieval quality, and the run store.
 
 ## Project structure
 
@@ -184,6 +184,10 @@ Not yet deployed. The path is fully configured: backend → Cloud Run (non-root 
 - **State durability:** the run store (SQLite) and artifacts are per-instance and reset on a Cloud Run cold start — fine for a demo. The `RunStore` interface is intentionally small to swap in Postgres/Redis + object storage.
 - **Cross-validation** is capped by a row threshold to keep demo runs fast; larger datasets skip CV and say so in the log.
 - **Hyperparameters** are fixed per model — an Optuna tuning pass is a natural next addition.
+- **The E2B sandbox path has no live test.** CI runs the subprocess backend, so it
+  verifies the security gate, the pinned SDK's call surface, and how a failed
+  execution is rendered — but nothing in CI actually talks to a sandbox. Running one
+  pipeline with a real E2B key is on the [TODO](TODO.md).
 - Full task list in [TODO.md](TODO.md).
 
 ## License
