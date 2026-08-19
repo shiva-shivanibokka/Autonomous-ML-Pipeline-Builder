@@ -259,7 +259,7 @@ async def _train_single_model(
     provider: str,
 ) -> tuple[str, ModelResult]:
     """Train one model (prep+estimator Pipeline) asynchronously. Returns (name, ModelResult)."""
-    loop = asyncio.get_event_loop()
+    loop = asyncio.get_running_loop()
 
     def _train():
         start = time.time()
@@ -478,8 +478,10 @@ def run_model_trainer(state: AgentState) -> dict:
                 if not result.get("error")
             ]
             log_comparison_table(comparison_rows)
-        except Exception:
-            pass
+        except Exception as exc:
+            # MLflow logging is best-effort — a tracking-server hiccup must not
+            # fail a training run that already succeeded. But it gets logged.
+            logger.warning("MLflow comparison table not logged: %s", exc)
 
         logs.append(f"[{timestamp}] MODEL TRAINER — Done.")
 

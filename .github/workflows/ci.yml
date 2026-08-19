@@ -29,6 +29,22 @@ jobs:
       - name: Pytest (with coverage)
         run: pytest --cov=. --cov-report=term-missing -q
 
+  docker:
+    name: Backend · image builds
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # The Dockerfile is the production artifact and had never actually been
+      # built — only reviewed. Building it here (no push) means a broken COPY,
+      # a dependency that has no wheel, or a bad base image fails the PR
+      # instead of the deploy.
+      - name: Build the image
+        run: docker build -t ml-pipeline-api:ci .
+      # Proves the image can import the app it is supposed to serve, which a
+      # successful build alone does not.
+      - name: Import the app inside the image
+        run: docker run --rm ml-pipeline-api:ci python -c "import api.main"
+
   frontend:
     name: Frontend · typecheck + build
     runs-on: ubuntu-latest

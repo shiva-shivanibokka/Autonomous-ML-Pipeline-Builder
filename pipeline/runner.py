@@ -5,7 +5,8 @@ Provides two interfaces:
   1. run_pipeline()  — blocking, returns final state dict
   2. stream_pipeline() — generator that yields log lines as they arrive
 
-Both interfaces are used by the FastAPI backend and Gradio UI.
+Both are used by the FastAPI backend, which turns them into the polled
+status/logs endpoints the Next.js console reads.
 """
 
 from __future__ import annotations
@@ -163,8 +164,6 @@ def stream_pipeline(
 ) -> Generator[str, None, None]:
     """
     Run the pipeline and yield log lines as each agent completes.
-
-    Used by the Gradio UI to stream output in real time.
 
     Yields:
         Individual log line strings as agents complete their steps.

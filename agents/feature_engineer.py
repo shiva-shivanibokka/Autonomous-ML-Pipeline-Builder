@@ -199,6 +199,9 @@ def _parse_list_from_stdout(stdout: str, key: str) -> list[str]:
             try:
                 raw = line.split(":", 1)[1].strip()
                 return ast.literal_eval(raw)
-            except Exception:
-                pass
+            except (ValueError, SyntaxError) as exc:
+                # The generated script printed the marker but not a Python
+                # literal after it. Keep scanning later lines, but say so —
+                # an empty feature list otherwise looks like "made none".
+                logger.warning("could not parse %s from stdout (%s): %r", key, exc, line)
     return []

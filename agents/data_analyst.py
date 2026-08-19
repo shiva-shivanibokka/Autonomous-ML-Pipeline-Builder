@@ -50,14 +50,16 @@ def _profile_dataframe(df: pd.DataFrame) -> dict:
     categorical_cols = df.select_dtypes(include=["object", "category"]).columns.tolist()
     datetime_cols = df.select_dtypes(include=["datetime64"]).columns.tolist()
 
-    # Detect datetime columns stored as strings
+    # Detect datetime columns stored as strings.
+    # `infer_datetime_format` has been a no-op since pandas 2.0 (inference is the
+    # default) and only produced a deprecation warning on every column.
     for col in categorical_cols[:]:
         try:
-            pd.to_datetime(df[col], infer_datetime_format=True)
-            datetime_cols.append(col)
-            categorical_cols.remove(col)
-        except Exception:
-            pass
+            pd.to_datetime(df[col])
+        except (ValueError, TypeError):
+            continue  # ordinary text column — not a date
+        datetime_cols.append(col)
+        categorical_cols.remove(col)
 
     missing_pct = {
         col: round(df[col].isna().mean() * 100, 2)

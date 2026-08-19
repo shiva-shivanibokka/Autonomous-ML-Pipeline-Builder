@@ -41,7 +41,6 @@ class Settings(BaseSettings):
     # ── Service ports ─────────────────────────────────────────────────────────
     api_host: str = Field(default="0.0.0.0", alias="API_HOST")
     api_port: int = Field(default=8000, alias="API_PORT")
-    gradio_port: int = Field(default=7860, alias="GRADIO_PORT")
 
     # ── Pipeline defaults ─────────────────────────────────────────────────────
     default_provider: str = Field(default="anthropic", alias="DEFAULT_PROVIDER")
