@@ -53,16 +53,35 @@ class RunStore:
         self._sweep(now)
 
     def update(self, run_id: str, now: float, **fields: Any) -> None:
-        """Merge `fields` into the run's record (JSON-serialisable values only)."""
+        """
+        Merge `fields` into the run's record (JSON-serialisable values only).
+
+        Upserts. The old version built a default record when the row was absent
+        and then ran an UPDATE that matched nothing, so a write against a swept
+        or unknown id was discarded without a word — including the "failed"
+        write that is the last thing a dying run does.
+        """
         with self._lock, sqlite3.connect(self.db_path) as conn:
             row = conn.execute(
-                "SELECT record FROM runs WHERE id = ?", (run_id,)
+                "SELECT created_at, record FROM runs WHERE id = ?", (run_id,)
             ).fetchone()
-            record = json.loads(row[0]) if row else {"status": "pending", "state": None}
+            created_at = row[0] if row else now
+            record = json.loads(row[1]) if row else {"status": "pending", "state": None}
             record.update(fields)
             conn.execute(
-                "UPDATE runs SET updated_at = ?, status = ?, record = ? WHERE id = ?",
-                (now, record.get("status", "pending"), json.dumps(record, default=str), run_id),
+                "INSERT INTO runs (id, created_at, updated_at, status, record)"
+                " VALUES (?, ?, ?, ?, ?)"
+                " ON CONFLICT(id) DO UPDATE SET"
+                "   updated_at = excluded.updated_at,"
+                "   status = excluded.status,"
+                "   record = excluded.record",
+                (
+                    run_id,
+                    created_at,
+                    now,
+                    record.get("status", "pending"),
+                    json.dumps(record, default=str),
+                ),
             )
 
     def get(self, run_id: str) -> Optional[dict]:

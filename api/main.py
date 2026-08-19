@@ -27,6 +27,7 @@ from __future__ import annotations
 
 import asyncio
 import re
+import shutil
 import time
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -142,8 +143,34 @@ _ALLOWED_ARTIFACTS = {
 }
 
 
+_RETENTION_SECONDS = 24 * 3600  # matches RunStore's TTL
+
+
 def _now() -> float:
     return time.time()
+
+
+def _sweep_disk(now: float) -> None:
+    """
+    Delete uploads and artifacts older than the run store's TTL.
+
+    The store swept its own rows but nothing ever removed the files those rows
+    pointed at, so `uploads/` and `outputs/` grew without bound while
+    _resolve_upload told callers their upload had "expired" — a state the code
+    had no way of reaching.
+    """
+    cutoff = now - _RETENTION_SECONDS
+    for target in (UPLOAD_DIR.glob("*.csv"), ARTIFACTS_ROOT.iterdir()):
+        for path in target:
+            try:
+                if path.stat().st_mtime >= cutoff:
+                    continue
+                if path.is_dir():
+                    shutil.rmtree(path, ignore_errors=True)
+                else:
+                    path.unlink(missing_ok=True)
+            except OSError as exc:
+                log.warning("sweep_failed", path=str(path), error=str(exc))
 
 
 def _resolve_upload(upload_id: str) -> Path:
@@ -203,6 +230,8 @@ async def upload_csv(file: UploadFile = File(...)):
             detail=f"File exceeds the {settings.max_upload_mb} MB limit.",
         )
 
+    _sweep_disk(_now())
+
     upload_id = uuid.uuid4().hex
     csv_path = UPLOAD_DIR / f"{upload_id}.csv"
     csv_path.write_bytes(content)
@@ -228,10 +257,16 @@ async def upload_csv(file: UploadFile = File(...)):
 
 def _run_pipeline_sync(pipeline_id: str, csv_path: str, request: PipelineRequest) -> None:
     """Run pipeline in a worker thread, persisting live progress to the store."""
-    from pipeline.runner import run_pipeline_streaming
-
     RUNS_STARTED.inc()
     _store.update(pipeline_id, _now(), status="running")
+
+    try:
+        from pipeline.runner import run_pipeline_streaming
+    except Exception as exc:  # import error here used to strand the run
+        RUNS_FAILED.inc()
+        log.error("runner_import_failed", pipeline_id=pipeline_id, error=str(exc))
+        _store.update(pipeline_id, _now(), status="failed", error=str(exc))
+        return
 
     def _on_update(state: dict) -> None:
         _store.update(
@@ -276,9 +311,22 @@ async def run_pipeline_endpoint(request: PipelineRequest):
     pipeline_id = uuid.uuid4().hex
     _store.create(pipeline_id, _now())
 
-    loop = asyncio.get_event_loop()
-    loop.run_in_executor(_executor, _run_pipeline_sync, pipeline_id, str(csv_path), request)
+    loop = asyncio.get_running_loop()
+    future = loop.run_in_executor(
+        _executor, _run_pipeline_sync, pipeline_id, str(csv_path), request
+    )
 
+    def _on_done(fut) -> None:
+        # Nothing else ever reads this future. Without a callback, an exception
+        # raised outside _run_pipeline_sync's own try block is swallowed by the
+        # executor and the run sits at "pending" forever while the UI polls it.
+        exc = fut.exception()
+        if exc is not None:
+            RUNS_FAILED.inc()
+            log.error("pipeline_worker_died", pipeline_id=pipeline_id, error=str(exc))
+            _store.update(pipeline_id, _now(), status="failed", error=str(exc))
+
+    future.add_done_callback(_on_done)
     return {"pipeline_id": pipeline_id, "status": "pending"}
 
 
