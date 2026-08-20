@@ -117,31 +117,31 @@ async def predict(request: PredictRequest):
         except (ValueError, TypeError):
             total_charges = 0.0
         
-        # Create feature dataframe matching model's expected input
+        # Create feature dataframe
         features_dict = {
-            'customerID': request.customerID,
-            'gender': request.gender,
-            'SeniorCitizen': request.SeniorCitizen,
-            'Partner': request.Partner,
-            'Dependents': request.Dependents,
-            'tenure': request.tenure,
-            'PhoneService': request.PhoneService,
-            'MultipleLines': request.MultipleLines,
-            'InternetService': request.InternetService,
-            'OnlineSecurity': request.OnlineSecurity,
-            'OnlineBackup': request.OnlineBackup,
-            'DeviceProtection': request.DeviceProtection,
-            'TechSupport': request.TechSupport,
-            'StreamingTV': request.StreamingTV,
-            'StreamingMovies': request.StreamingMovies,
-            'Contract': request.Contract,
-            'PaperlessBilling': request.PaperlessBilling,
-            'PaymentMethod': request.PaymentMethod,
-            'MonthlyCharges': request.MonthlyCharges,
-            'TotalCharges': total_charges
+            'customerID': [request.customerID],
+            'gender': [request.gender],
+            'SeniorCitizen': [request.SeniorCitizen],
+            'Partner': [request.Partner],
+            'Dependents': [request.Dependents],
+            'tenure': [request.tenure],
+            'PhoneService': [request.PhoneService],
+            'MultipleLines': [request.MultipleLines],
+            'InternetService': [request.InternetService],
+            'OnlineSecurity': [request.OnlineSecurity],
+            'OnlineBackup': [request.OnlineBackup],
+            'DeviceProtection': [request.DeviceProtection],
+            'TechSupport': [request.TechSupport],
+            'StreamingTV': [request.StreamingTV],
+            'StreamingMovies': [request.StreamingMovies],
+            'Contract': [request.Contract],
+            'PaperlessBilling': [request.PaperlessBilling],
+            'PaymentMethod': [request.PaymentMethod],
+            'MonthlyCharges': [request.MonthlyCharges],
+            'TotalCharges': [total_charges]
         }
         
-        X = pd.DataFrame([features_dict])
+        X = pd.DataFrame(features_dict)
         
         # Make prediction
         prediction = model.predict(X)[0]
@@ -158,7 +158,10 @@ async def predict(request: PredictRequest):
         # Calculate latency
         latency = time.time() - start_time
         
-        # Log prediction with structured format
+        # Increment prediction counter
+        prediction_counter.labels(model_version=model_version).inc()
+        
+        # Structured logging
         log_entry = {
             'timestamp': datetime.utcnow().isoformat(),
             'input_hash': input_hash,
@@ -168,9 +171,6 @@ async def predict(request: PredictRequest):
             'model_version': model_version
         }
         logger.info(f"Prediction made: {json.dumps(log_entry)}")
-        
-        # Increment prediction counter
-        prediction_counter.labels(model_version=model_version).inc()
         
         return PredictResponse(
             prediction=str(prediction),
