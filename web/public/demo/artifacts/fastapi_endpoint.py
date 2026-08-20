@@ -58,7 +58,7 @@ class PredictRequest(BaseModel):
 
 class PredictResponse(BaseModel):
     prediction: str
-    probability: float = Field(..., description="Probability of the predicted class")
+    probability: float
     model_version: str
 
 
@@ -117,38 +117,39 @@ async def predict(request: PredictRequest):
         except (ValueError, TypeError):
             total_charges = 0.0
         
-        # Create feature dataframe
+        # Create feature vector in the order expected by the model
         features_dict = {
-            'customerID': [request.customerID],
-            'gender': [request.gender],
-            'SeniorCitizen': [request.SeniorCitizen],
-            'Partner': [request.Partner],
-            'Dependents': [request.Dependents],
-            'tenure': [request.tenure],
-            'PhoneService': [request.PhoneService],
-            'MultipleLines': [request.MultipleLines],
-            'InternetService': [request.InternetService],
-            'OnlineSecurity': [request.OnlineSecurity],
-            'OnlineBackup': [request.OnlineBackup],
-            'DeviceProtection': [request.DeviceProtection],
-            'TechSupport': [request.TechSupport],
-            'StreamingTV': [request.StreamingTV],
-            'StreamingMovies': [request.StreamingMovies],
-            'Contract': [request.Contract],
-            'PaperlessBilling': [request.PaperlessBilling],
-            'PaymentMethod': [request.PaymentMethod],
-            'MonthlyCharges': [request.MonthlyCharges],
-            'TotalCharges': [total_charges]
+            'customerID': request.customerID,
+            'gender': request.gender,
+            'SeniorCitizen': request.SeniorCitizen,
+            'Partner': request.Partner,
+            'Dependents': request.Dependents,
+            'tenure': request.tenure,
+            'PhoneService': request.PhoneService,
+            'MultipleLines': request.MultipleLines,
+            'InternetService': request.InternetService,
+            'OnlineSecurity': request.OnlineSecurity,
+            'OnlineBackup': request.OnlineBackup,
+            'DeviceProtection': request.DeviceProtection,
+            'TechSupport': request.TechSupport,
+            'StreamingTV': request.StreamingTV,
+            'StreamingMovies': request.StreamingMovies,
+            'Contract': request.Contract,
+            'PaperlessBilling': request.PaperlessBilling,
+            'PaymentMethod': request.PaymentMethod,
+            'MonthlyCharges': request.MonthlyCharges,
+            'TotalCharges': total_charges
         }
         
-        X = pd.DataFrame(features_dict)
+        # Create DataFrame for prediction
+        df = pd.DataFrame([features_dict])
         
         # Make prediction
-        prediction = model.predict(X)[0]
+        prediction = model.predict(df)[0]
         
         # Get prediction probability
         if hasattr(model, 'predict_proba'):
-            probabilities = model.predict_proba(X)[0]
+            probabilities = model.predict_proba(df)[0]
             # Get probability of the predicted class
             class_index = list(model.classes_).index(prediction)
             probability = float(probabilities[class_index])
@@ -158,19 +159,17 @@ async def predict(request: PredictRequest):
         # Calculate latency
         latency = time.time() - start_time
         
+        # Log prediction with structured format
+        logger.info(
+            f"Prediction made - Input Hash: {input_hash}, "
+            f"Prediction: {prediction}, "
+            f"Probability: {probability:.4f}, "
+            f"Latency: {latency:.4f}s, "
+            f"Timestamp: {datetime.utcnow().isoformat()}"
+        )
+        
         # Increment prediction counter
         prediction_counter.labels(model_version=model_version).inc()
-        
-        # Structured logging
-        log_entry = {
-            'timestamp': datetime.utcnow().isoformat(),
-            'input_hash': input_hash,
-            'prediction': str(prediction),
-            'probability': probability,
-            'latency_seconds': latency,
-            'model_version': model_version
-        }
-        logger.info(f"Prediction made: {json.dumps(log_entry)}")
         
         return PredictResponse(
             prediction=str(prediction),
@@ -180,7 +179,7 @@ async def predict(request: PredictRequest):
         
     except Exception as e:
         logger.error(f"Error during prediction: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Prediction error: {str(e)}")
 
 
 if __name__ == "__main__":

@@ -166,6 +166,11 @@ export default function Home() {
     : AGENTS.map((a) => ({ ...a, state: "pending" as AgentState }));
   const doneCount = agents.filter((a) => a.state === "done").length;
 
+  // No backend to reach: the setup controls would only produce a connection
+  // error, so say what to do instead of offering a form that cannot work.
+  const [replayOnly, setReplayOnly] = useState(false);
+  useEffect(() => setReplayOnly(shouldAutoplayReplay()), []);
+
   // Follow the work: starting a run shows the pipeline, finishing one shows the
   // results. Only ever moves forward, so it cannot yank a tab out from under
   // someone who navigated away deliberately.
@@ -263,7 +268,11 @@ export default function Home() {
       {tab === "setup" && (
         <section role="tabpanel" id="panel-setup" aria-labelledby="tab-setup">
           <div style={{ display: "grid", gap: 22, gridTemplateColumns: "minmax(340px, 460px) 1fr", alignItems: "start" }} className="workspace">
-            <ControlPanel running={running} onRun={onRun} />
+            <ControlPanel
+              running={running}
+              onRun={onRun}
+              replayOnly={replayOnly}
+            />
             <HowItWorks />
           </div>
         </section>

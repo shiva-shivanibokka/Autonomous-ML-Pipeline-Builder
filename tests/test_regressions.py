@@ -10,6 +10,7 @@ and how a failed execution is turned into text.
 """
 
 import json
+import pathlib
 import sys
 
 import pytest
@@ -364,3 +365,45 @@ def test_a_module_that_already_parses_is_left_alone():
 
     src = 'def f():\n    """Usage:\n\n    ```\n    f()\n    ```\n    """\n    return 1\n'
     assert extract_code(src).strip() == src.strip()
+
+
+# ── SHAP explainability ───────────────────────────────────────────────────────
+
+
+def test_multiclass_shap_values_are_reduced_to_one_matrix():
+    """
+    Older SHAP returned a list per class and the code sliced [1]. Newer SHAP
+    returns a single (samples, features, classes) ndarray, which is not a list,
+    so the slice never ran and a 3-D array reached summary_plot — which reads
+    3-D as *interaction* values and drew a one-feature interaction chart instead
+    of the ranked feature-importance summary. It still looked like a plot, so
+    nothing caught it until someone looked at the picture.
+    """
+    import numpy as np
+
+    from agents.evaluator import _positive_class_values
+
+    # New shap: 3-D ndarray.
+    arr = np.zeros((10, 4, 2))
+    arr[:, :, 1] = 7.0
+    out = _positive_class_values(arr)
+    assert out.ndim == 2 and out.shape == (10, 4)
+    assert (out == 7.0).all(), "took the wrong class slice"
+
+    # Old shap: list of per-class arrays.
+    out = _positive_class_values([np.zeros((10, 4)), np.full((10, 4), 7.0)])
+    assert out.shape == (10, 4) and (out == 7.0).all()
+
+    # Regression / single output: already 2-D, left alone.
+    out = _positive_class_values(np.full((10, 4), 3.0))
+    assert out.shape == (10, 4) and (out == 3.0).all()
+
+
+def test_shap_plot_palette_matches_the_console():
+    """The plot is embedded in a dark page; a white figure looks pasted on."""
+    from agents.evaluator import _PLOT_ACCENT, _PLOT_BG
+
+    css = pathlib.Path(__file__).resolve().parents[1] / "web" / "app" / "globals.css"
+    text = css.read_text(encoding="utf-8")
+    assert _PLOT_BG in text, "plot background is not one of the CSS tokens"
+    assert _PLOT_ACCENT in text, "plot accent is not one of the CSS tokens"

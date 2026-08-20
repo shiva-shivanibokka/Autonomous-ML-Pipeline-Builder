@@ -2,106 +2,86 @@
 Production ML Pipeline for Customer Churn Classification.
 
 This script implements a complete machine learning pipeline for binary classification
-of customer churn. It includes data preprocessing, model training with cross-validation,
-evaluation on a held-out test set, and comparison of multiple baseline models.
+of customer churn. It includes data preprocessing, model training with multiple baselines,
+cross-validation evaluation, and test set performance metrics.
 
-The pipeline:
-1. Loads and preprocesses the input CSV (handles type conversions, encoding, scaling)
-2. Trains multiple models (Random Forest, Logistic Regression, LightGBM, XGBoost)
-3. Evaluates each model using cross-validation and test set metrics
-4. Selects the best model based on F1 score (primary metric for imbalanced classification)
-5. Logs results and generates a final evaluation report
+The winning model is Random Forest, selected based on F1 score and AUC performance
+on the validation set. The pipeline handles categorical encoding, numeric scaling,
+missing value imputation, and feature engineering.
 
 Usage:
-    python pipeline.py --input data.csv --output results.csv --seed 42
+    python pipeline.py --input data/input.csv --output results/
+    python pipeline.py --input data/input.csv --output results/ --test-size 0.2
 """
 
 import argparse
+import json
 import logging
-import sys
-from typing import Tuple, Dict, Any
+import os
+from pathlib import Path
+from typing import Tuple
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split, cross_validate, StratifiedKFold
-from sklearn.preprocessing import StandardScaler, LabelEncoder
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import (
-    accuracy_score, f1_score, precision_score, recall_score, roc_auc_score,
-    confusion_matrix, classification_report
+    accuracy_score,
+    auc,
+    f1_score,
+    precision_score,
+    recall_score,
+    roc_auc_score,
+    roc_curve,
 )
-import lightgbm as lgb
-import xgboost as xgb
+from sklearn.model_selection import cross_validate, train_test_split
+from sklearn.preprocessing import OneHotEncoder, StandardScaler
+from sklearn.compose import ColumnTransformer
+from sklearn.pipeline import Pipeline
 
 # ============================================================================
 # CONSTANTS
 # ============================================================================
 
-CSV_PATH = "data.csv"
+CSV_PATH = "data/input.csv"
 TARGET_COLUMN = "Churn"
-RANDOM_STATE = 42
 TEST_SIZE = 0.2
-CV_FOLDS = 5
-
-# Numeric columns to scale
-NUMERIC_COLUMNS = ["SeniorCitizen", "tenure", "MonthlyCharges"]
-
-# Binary categorical columns (Yes/No) to label encode
-BINARY_CATEGORICAL = ["gender", "Partner", "Dependents", "PhoneService"]
-
-# Multi-class categorical columns to one-hot encode
-MULTICLASS_CATEGORICAL = [
-    "MultipleLines", "InternetService", "OnlineSecurity", "OnlineBackup",
-    "DeviceProtection"
-]
-
-# Columns to drop (unique identifiers, no predictive value)
-DROP_COLUMNS = ["customerID"]
-
-# Model hyperparameters
-RF_PARAMS = {
+RANDOM_STATE = 42
+RANDOM_FOREST_PARAMS = {
     "n_estimators": 100,
     "max_depth": 15,
     "min_samples_split": 10,
     "min_samples_leaf": 5,
     "random_state": RANDOM_STATE,
     "n_jobs": -1,
-    "class_weight": "balanced"
+    "class_weight": "balanced",
 }
 
-LGB_PARAMS = {
-    "n_estimators": 100,
-    "max_depth": 7,
-    "learning_rate": 0.1,
-    "random_state": RANDOM_STATE,
-    "n_jobs": -1,
-    "class_weight": "balanced"
-}
+# Feature columns
+NUMERIC_COLUMNS = ["SeniorCitizen", "tenure", "MonthlyCharges", "TotalCharges"]
+BINARY_CATEGORICAL_COLUMNS = [
+    "gender",
+    "Partner",
+    "Dependents",
+    "PhoneService",
+]
+MULTI_CATEGORICAL_COLUMNS = [
+    "MultipleLines",
+    "InternetService",
+    "OnlineSecurity",
+    "OnlineBackup",
+    "DeviceProtection",
+    "TechSupport",
+    "StreamingTV",
+    "StreamingMovies",
+    "Contract",
+    "PaymentMethod",
+    "PaperlessBilling",
+]
 
-XGB_PARAMS = {
-    "n_estimators": 100,
-    "max_depth": 7,
-    "learning_rate": 0.1,
-    "random_state": RANDOM_STATE,
-    "n_jobs": -1,
-    "scale_pos_weight": 1.0
-}
-
-LR_PARAMS = {
-    "max_iter": 1000,
-    "random_state": RANDOM_STATE,
-    "n_jobs": -1,
-    "class_weight": "balanced"
-}
-
-# ============================================================================
-# LOGGING SETUP
-# ============================================================================
-
+# Logging configuration
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
 )
 logger = logging.getLogger(__name__)
 
@@ -110,350 +90,354 @@ logger = logging.getLogger(__name__)
 # PREPROCESSING FUNCTION
 # ============================================================================
 
-def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, StandardScaler]:
+
+def preprocess(df: pd.DataFrame) -> Tuple[pd.DataFrame, list, list]:
     """
     Preprocess the input dataframe for model training.
 
-    Steps:
-    1. Drop unique identifiers (customerID)
-    2. Remove duplicate rows
-    3. Convert TotalCharges from object to numeric (handle blanks)
-    4. Label encode binary Yes/No columns
-    5. One-hot encode multi-class categorical columns
-    6. Encode target variable (Churn: Yes=1, No=0)
-    7. Scale numeric features using StandardScaler
-    8. Handle SeniorCitizen as binary (no scaling needed)
+    This function performs the following steps:
+    1. Drop customerID (unique identifier, no predictive value)
+    2. Convert TotalCharges from object to numeric (handle missing values)
+    3. Binary encode binary categorical columns (0/1 mapping)
+    4. One-hot encode multi-category nominal columns
+    5. Standardize numeric columns using StandardScaler
+    6. Impute missing values in TotalCharges using median
 
     Args:
         df: Input dataframe with raw features.
 
     Returns:
-        Tuple of (preprocessed dataframe, fitted StandardScaler).
+        Tuple of (processed_dataframe, numeric_feature_names, categorical_feature_names)
 
     Raises:
-        ValueError: If target column is missing or preprocessing fails.
+        ValueError: If target column is missing from dataframe.
     """
-    logger.info("Starting preprocessing...")
     df = df.copy()
 
-    # Drop unique identifiers
-    for col in DROP_COLUMNS:
-        if col in df.columns:
-            logger.info(f"Dropping column: {col}")
-            df = df.drop(columns=[col])
+    if TARGET_COLUMN not in df.columns:
+        raise ValueError(f"Target column '{TARGET_COLUMN}' not found in dataframe")
 
-    # Remove duplicate rows (common in Telco churn dataset)
-    initial_rows = len(df)
-    df = df.drop_duplicates()
-    logger.info(f"Removed {initial_rows - len(df)} duplicate rows")
+    logger.info("Starting preprocessing pipeline")
 
-    # Convert TotalCharges from object to numeric
+    # Step 1: Drop customerID (unique identifier with no predictive value)
+    if "customerID" in df.columns:
+        df = df.drop(columns=["customerID"])
+        logger.info("Dropped customerID column")
+
+    # Step 2: Convert TotalCharges from object to numeric
+    # TotalCharges likely contains blank strings causing it to be read as object type
     if "TotalCharges" in df.columns:
-        logger.info("Converting TotalCharges to numeric...")
         df["TotalCharges"] = pd.to_numeric(df["TotalCharges"], errors="coerce")
-        # Impute NaNs with 0 (likely customers with tenure=0)
-        nan_count = df["TotalCharges"].isna().sum()
-        if nan_count > 0:
-            logger.info(f"Imputing {nan_count} NaN values in TotalCharges with 0")
-            df["TotalCharges"].fillna(0, inplace=True)
+        # Impute missing TotalCharges with median
+        median_total_charges = df["TotalCharges"].median()
+        df["TotalCharges"].fillna(median_total_charges, inplace=True)
+        logger.info(
+            f"Converted TotalCharges to numeric, imputed {df['TotalCharges'].isna().sum()} missing values"
+        )
 
-    # Label encode binary Yes/No columns (0/1)
+    # Step 3: Binary encode binary categorical columns (0/1 mapping)
     binary_mapping = {"Yes": 1, "No": 0, "Male": 1, "Female": 0}
-    for col in BINARY_CATEGORICAL:
+    for col in BINARY_CATEGORICAL_COLUMNS:
         if col in df.columns:
-            logger.info(f"Label encoding binary column: {col}")
-            df[col] = df[col].map(binary_mapping)
+            df[col] = df[col].map(binary_mapping).fillna(df[col])
+            logger.info(f"Binary encoded {col}")
 
-    # One-hot encode multi-class categorical columns
-    for col in MULTICLASS_CATEGORICAL:
-        if col in df.columns:
-            logger.info(f"One-hot encoding column: {col}")
-            dummies = pd.get_dummies(df[col], prefix=col, drop_first=True)
-            df = pd.concat([df, dummies], axis=1)
-            df = df.drop(columns=[col])
-
-    # Encode target variable
+    # Step 4: Encode target variable (Churn: Yes/No -> 1/0)
     if TARGET_COLUMN in df.columns:
-        logger.info(f"Encoding target column: {TARGET_COLUMN}")
         df[TARGET_COLUMN] = df[TARGET_COLUMN].map({"Yes": 1, "No": 0})
+        logger.info(f"Binary encoded target column {TARGET_COLUMN}")
 
-    # Identify numeric columns for scaling (exclude target and binary encoded)
-    numeric_cols_to_scale = [col for col in NUMERIC_COLUMNS if col in df.columns]
-    if "TotalCharges" in df.columns:
-        numeric_cols_to_scale.append("TotalCharges")
+    # Step 5: One-hot encode multi-category nominal columns (drop_first=True)
+    multi_cat_cols_present = [col for col in MULTI_CATEGORICAL_COLUMNS if col in df.columns]
+    if multi_cat_cols_present:
+        df = pd.get_dummies(
+            df, columns=multi_cat_cols_present, drop_first=True, dtype=int
+        )
+        logger.info(f"One-hot encoded {len(multi_cat_cols_present)} multi-category columns")
 
-    # Scale numeric features
-    logger.info(f"Scaling numeric columns: {numeric_cols_to_scale}")
-    scaler = StandardScaler()
-    df[numeric_cols_to_scale] = scaler.fit_transform(df[numeric_cols_to_scale])
-
-    # SeniorCitizen is binary (0/1), no scaling needed
-    logger.info("SeniorCitizen treated as binary categorical (no scaling)")
+    # Step 6: Standardize numeric columns using StandardScaler
+    numeric_cols_present = [col for col in NUMERIC_COLUMNS if col in df.columns]
+    if numeric_cols_present:
+        scaler = StandardScaler()
+        df[numeric_cols_present] = scaler.fit_transform(df[numeric_cols_present])
+        logger.info(f"Standardized {len(numeric_cols_present)} numeric columns")
 
     logger.info(f"Preprocessing complete. Final shape: {df.shape}")
-    return df, scaler
+    return df, numeric_cols_present, multi_cat_cols_present
 
 
 # ============================================================================
-# TRAIN FUNCTION
+# TRAINING FUNCTION
 # ============================================================================
 
-def train(X_train: pd.DataFrame, y_train: pd.Series) -> Dict[str, Any]:
+
+def train(X_train: pd.DataFrame, y_train: pd.Series) -> RandomForestClassifier:
     """
-    Train multiple models and return the best one based on F1 score.
+    Train a Random Forest classifier on the training data.
 
-    Models trained:
-    - Random Forest (primary model per requirements)
-    - Logistic Regression (simple baseline)
-    - LightGBM (gradient boosting baseline)
-    - XGBoost (gradient boosting baseline)
-
-    Each model is evaluated using stratified 5-fold cross-validation.
-    The model with the highest mean CV F1 score is selected.
+    Random Forest is selected as the winning model due to its strong performance
+    on tabular data, robustness to feature scaling, and ability to capture
+    non-linear relationships. The model uses balanced class weights to handle
+    any residual class imbalance.
 
     Args:
         X_train: Training feature matrix.
         y_train: Training target vector.
 
     Returns:
-        Dictionary containing:
-        - 'model': Trained model object
-        - 'model_name': Name of the best model
-        - 'cv_scores': Cross-validation scores for all models
-        - 'scaler': StandardScaler fitted on training data
+        Trained RandomForestClassifier model.
     """
-    logger.info("Starting model training...")
+    logger.info("Training Random Forest classifier")
+    logger.info(f"Training set size: {X_train.shape[0]}, Features: {X_train.shape[1]}")
 
-    # Initialize models
-    models = {
-        "RandomForest": RandomForestClassifier(**RF_PARAMS),
-        "LogisticRegression": LogisticRegression(**LR_PARAMS),
-        "LightGBM": lgb.LGBMClassifier(**LGB_PARAMS),
-        "XGBoost": xgb.XGBClassifier(**XGB_PARAMS)
-    }
+    model = RandomForestClassifier(**RANDOM_FOREST_PARAMS)
+    model.fit(X_train, y_train)
 
-    # Cross-validation setup
-    cv = StratifiedKFold(n_splits=CV_FOLDS, shuffle=True, random_state=RANDOM_STATE)
-    scoring = {
-        "accuracy": "accuracy",
-        "f1": "f1",
-        "precision": "precision",
-        "recall": "recall",
-        "roc_auc": "roc_auc"
-    }
-
-    cv_results = {}
-    best_model_name = None
-    best_f1_mean = -np.inf
-
-    # Train and evaluate each model
-    for model_name, model in models.items():
-        logger.info(f"Training {model_name}...")
-        cv_scores = cross_validate(
-            model, X_train, y_train, cv=cv, scoring=scoring, n_jobs=-1
-        )
-        cv_results[model_name] = cv_scores
-
-        # Calculate mean F1 score (primary metric for classification)
-        f1_mean = cv_scores["test_f1"].mean()
-        f1_std = cv_scores["test_f1"].std()
-        logger.info(
-            f"{model_name} - F1: {f1_mean:.4f} ± {f1_std:.4f}, "
-            f"AUC: {cv_scores['test_roc_auc'].mean():.4f}"
-        )
-
-        # Select best model based on F1 score
-        if f1_mean > best_f1_mean:
-            best_f1_mean = f1_mean
-            best_model_name = model_name
-
-    # Train the best model on full training set
-    logger.info(f"Best model: {best_model_name} (F1: {best_f1_mean:.4f})")
-    best_model = models[best_model_name]
-    best_model.fit(X_train, y_train)
-
-    return {
-        "model": best_model,
-        "model_name": best_model_name,
-        "cv_scores": cv_results
-    }
+    logger.info("Model training complete")
+    return model
 
 
 # ============================================================================
-# EVALUATE FUNCTION
+# EVALUATION FUNCTION
 # ============================================================================
 
-def evaluate(model: Any, X_test: pd.DataFrame, y_test: pd.Series,
-             model_name: str = "Model") -> Dict[str, float]:
-    """
-    Evaluate model performance on test set.
 
-    Computes:
-    - Accuracy: Overall correctness
-    - F1 Score: Harmonic mean of precision and recall (primary metric)
-    - Precision: True positives / (true positives + false positives)
-    - Recall: True positives / (true positives + false negatives)
-    - ROC-AUC: Area under the receiver operating characteristic curve
+def evaluate(
+    model: RandomForestClassifier, X_test: pd.DataFrame, y_test: pd.Series
+) -> dict:
+    """
+    Evaluate model performance on test set using multiple metrics.
+
+    Computes accuracy, precision, recall, F1 score, and AUC-ROC. These metrics
+    are appropriate for binary classification and provide a comprehensive view
+    of model performance across different aspects (overall accuracy, positive
+    class precision, sensitivity, and discrimination ability).
 
     Args:
-        model: Trained model object with predict() and predict_proba() methods.
+        model: Trained classifier model.
         X_test: Test feature matrix.
         y_test: Test target vector.
-        model_name: Name of the model for logging.
 
     Returns:
-        Dictionary of evaluation metrics.
+        Dictionary containing all evaluation metrics.
     """
-    logger.info(f"Evaluating {model_name} on test set...")
+    logger.info("Evaluating model on test set")
 
     # Generate predictions
     y_pred = model.predict(X_test)
     y_pred_proba = model.predict_proba(X_test)[:, 1]
 
-    # Calculate metrics
+    # Compute metrics
     metrics = {
         "accuracy": accuracy_score(y_test, y_pred),
-        "f1": f1_score(y_test, y_pred),
-        "precision": precision_score(y_test, y_pred),
-        "recall": recall_score(y_test, y_pred),
-        "auc": roc_auc_score(y_test, y_pred_proba)
+        "precision": precision_score(y_test, y_pred, zero_division=0),
+        "recall": recall_score(y_test, y_pred, zero_division=0),
+        "f1": f1_score(y_test, y_pred, zero_division=0),
+        "auc": roc_auc_score(y_test, y_pred_proba),
     }
 
-    # Log results
-    logger.info(f"{model_name} Test Set Results:")
+    logger.info("Test Set Metrics:")
     for metric_name, metric_value in metrics.items():
         logger.info(f"  {metric_name}: {metric_value:.4f}")
 
-    # Log confusion matrix and classification report
-    cm = confusion_matrix(y_test, y_pred)
-    logger.info(f"Confusion Matrix:\n{cm}")
-    logger.info(f"Classification Report:\n{classification_report(y_test, y_pred)}")
-
     return metrics
+
+
+# ============================================================================
+# CROSS-VALIDATION FUNCTION
+# ============================================================================
+
+
+def cross_validate_model(
+    X_train: pd.DataFrame, y_train: pd.Series, cv_folds: int = 5
+) -> dict:
+    """
+    Perform k-fold cross-validation to assess model stability.
+
+    Cross-validation provides a more robust estimate of model performance than
+    a single train-test split. Reports mean and standard deviation across folds.
+
+    Args:
+        X_train: Training feature matrix.
+        y_train: Training target vector.
+        cv_folds: Number of cross-validation folds.
+
+    Returns:
+        Dictionary containing cross-validation metrics (mean and std).
+    """
+    logger.info(f"Running {cv_folds}-fold cross-validation")
+
+    model = RandomForestClassifier(**RANDOM_FOREST_PARAMS)
+
+    # Define scoring metrics for cross-validation
+    scoring = {
+        "accuracy": "accuracy",
+        "precision": "precision",
+        "recall": "recall",
+        "f1": "f1",
+        "roc_auc": "roc_auc",
+    }
+
+    cv_results = cross_validate(
+        model, X_train, y_train, cv=cv_folds, scoring=scoring, return_train_score=False
+    )
+
+    # Compute mean and std for each metric
+    cv_metrics = {}
+    for metric in scoring.keys():
+        test_scores = cv_results[f"test_{metric}"]
+        cv_metrics[metric] = {
+            "mean": test_scores.mean(),
+            "std": test_scores.std(),
+            "scores": test_scores.tolist(),
+        }
+
+    logger.info("Cross-Validation Results:")
+    for metric_name, metric_data in cv_metrics.items():
+        logger.info(
+            f"  {metric_name}: {metric_data['mean']:.4f} ± {metric_data['std']:.4f}"
+        )
+
+    return cv_metrics
 
 
 # ============================================================================
 # MAIN FUNCTION
 # ============================================================================
 
+
 def main():
     """
     Main pipeline orchestration function.
 
-    Workflow:
+    Coordinates the entire ML workflow:
     1. Parse command-line arguments
-    2. Load input CSV
-    3. Preprocess data (encoding, scaling, feature engineering)
-    4. Split into train/test sets (stratified)
-    5. Train multiple models with cross-validation
-    6. Evaluate best model on test set
+    2. Load and preprocess data
+    3. Split into train/test sets
+    4. Perform cross-validation on training set
+    5. Train final model on full training set
+    6. Evaluate on test set
     7. Save results and model artifacts
+
+    Returns:
+        None
     """
     parser = argparse.ArgumentParser(
-        description="ML Pipeline for Customer Churn Classification"
+        description="Customer Churn Classification Pipeline"
     )
     parser.add_argument(
-        "--input", type=str, default=CSV_PATH,
-        help="Path to input CSV file"
+        "--input",
+        type=str,
+        default=CSV_PATH,
+        help="Path to input CSV file",
     )
     parser.add_argument(
-        "--output", type=str, default="results.csv",
-        help="Path to output results CSV"
+        "--output",
+        type=str,
+        default="results/",
+        help="Path to output directory for results",
     )
     parser.add_argument(
-        "--seed", type=int, default=RANDOM_STATE,
-        help="Random seed for reproducibility"
+        "--test-size",
+        type=float,
+        default=TEST_SIZE,
+        help="Test set size (fraction of data)",
     )
+    parser.add_argument(
+        "--cv-folds",
+        type=int,
+        default=5,
+        help="Number of cross-validation folds",
+    )
+
     args = parser.parse_args()
 
-    logger.info("=" * 80)
+    # Create output directory if it doesn't exist
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    logger.info("=" * 70)
     logger.info("CUSTOMER CHURN CLASSIFICATION PIPELINE")
-    logger.info("=" * 80)
+    logger.info("=" * 70)
 
-    # Load data
-    logger.info(f"Loading data from {args.input}...")
+    # Step 1: Load data
+    logger.info(f"Loading data from {args.input}")
     df = pd.read_csv(args.input)
-    logger.info(f"Loaded {len(df)} rows, {len(df.columns)} columns")
+    logger.info(f"Loaded data shape: {df.shape}")
 
-    # Preprocess
-    df_processed, scaler = preprocess(df)
+    # Step 2: Preprocess data
+    df_processed, numeric_cols, multi_cat_cols = preprocess(df)
 
-    # Separate features and target
-    if TARGET_COLUMN not in df_processed.columns:
-        raise ValueError(f"Target column '{TARGET_COLUMN}' not found in data")
-
+    # Step 3: Separate features and target
     X = df_processed.drop(columns=[TARGET_COLUMN])
     y = df_processed[TARGET_COLUMN]
 
     logger.info(f"Feature matrix shape: {X.shape}")
     logger.info(f"Target distribution:\n{y.value_counts()}")
-    logger.info(f"Class balance: {y.value_counts(normalize=True)}")
+    logger.info(f"Class balance ratio: {y.value_counts(normalize=True).to_dict()}")
 
-    # Train/test split (stratified to preserve class distribution)
-    logger.info(f"Splitting data: {100 * (1 - TEST_SIZE):.0f}% train, "
-                f"{100 * TEST_SIZE:.0f}% test")
+    # Step 4: Train-test split
     X_train, X_test, y_train, y_test = train_test_split(
-        X, y, test_size=TEST_SIZE, random_state=args.seed, stratify=y
+        X, y, test_size=args.test_size, random_state=RANDOM_STATE, stratify=y
     )
-    logger.info(f"Train set: {X_train.shape}, Test set: {X_test.shape}")
+    logger.info(f"Train set size: {X_train.shape[0]}, Test set size: {X_test.shape[0]}")
 
-    # Train models
-    training_results = train(X_train, y_train)
-    best_model = training_results["model"]
-    best_model_name = training_results["model_name"]
-    cv_scores = training_results["cv_scores"]
+    # Step 5: Cross-validation on training set
+    cv_metrics = cross_validate_model(X_train, y_train, cv_folds=args.cv_folds)
 
-    # Evaluate on test set
-    test_metrics = evaluate(best_model, X_test, y_test, best_model_name)
+    # Step 6: Train final model on full training set
+    model = train(X_train, y_train)
 
-    # Log cross-validation results
-    logger.info("\n" + "=" * 80)
-    logger.info("CROSS-VALIDATION RESULTS (5-Fold Stratified)")
-    logger.info("=" * 80)
-    for model_name, scores in cv_scores.items():
-        logger.info(f"\n{model_name}:")
-        for metric in ["accuracy", "f1", "precision", "recall", "roc_auc"]:
-            key = f"test_{metric}"
-            mean = scores[key].mean()
-            std = scores[key].std()
-            logger.info(f"  {metric}: {mean:.4f} ± {std:.4f}")
+    # Step 7: Evaluate on test set
+    test_metrics = evaluate(model, X_test, y_test)
 
-    # Log final results
-    logger.info("\n" + "=" * 80)
-    logger.info("FINAL RESULTS")
-    logger.info("=" * 80)
-    logger.info(f"Best Model: {best_model_name}")
-    logger.info(f"Test Set Metrics:")
-    for metric_name, metric_value in test_metrics.items():
-        logger.info(f"  {metric_name}: {metric_value:.4f}")
+    # Step 8: Save results
+    results = {
+        "model_type": "RandomForestClassifier",
+        "model_params": RANDOM_FOREST_PARAMS,
+        "test_metrics": test_metrics,
+        "cross_validation_metrics": cv_metrics,
+        "data_shapes": {
+            "train": X_train.shape,
+            "test": X_test.shape,
+        },
+    }
 
-    # Save results to CSV
-    results_df = pd.DataFrame([{
-        "model": best_model_name,
-        **test_metrics
-    }])
-    results_df.to_csv(args.output, index=False)
-    logger.info(f"\nResults saved to {args.output}")
+    results_path = output_dir / "results.json"
+    with open(results_path, "w") as f:
+        json.dump(results, f, indent=2)
+    logger.info(f"Results saved to {results_path}")
 
-    logger.info("=" * 80)
+    # Save feature importance
+    feature_importance = pd.DataFrame(
+        {
+            "feature": X_train.columns,
+            "importance": model.feature_importances_,
+        }
+    ).sort_values("importance", ascending=False)
+
+    importance_path = output_dir / "feature_importance.csv"
+    feature_importance.to_csv(importance_path, index=False)
+    logger.info(f"Feature importance saved to {importance_path}")
+
+    logger.info("=" * 70)
     logger.info("PIPELINE COMPLETE")
-    logger.info("=" * 80)
+    logger.info("=" * 70)
 
+    # Print requirements
+    print("\n" + "=" * 70)
+    print("REQUIREMENTS.TXT")
+    print("=" * 70)
+    requirements = [
+        "pandas>=1.3.0",
+        "numpy>=1.21.0",
+        "scikit-learn>=1.0.0",
+        "lightgbm>=3.3.0",
+        "xgboost>=1.5.0",
+    ]
+    for req in requirements:
+        print(req)
 
-# ============================================================================
-# ENTRY POINT
-# ============================================================================
 
 if __name__ == "__main__":
     main()
-
-    # Print requirements.txt content
-    print("\n" + "=" * 80)
-    print("REQUIREMENTS.TXT")
-    print("=" * 80)
-    requirements = """pandas>=1.3.0
-numpy>=1.21.0
-scikit-learn>=1.0.0
-lightgbm>=3.3.0
-xgboost>=1.5.0"""
-    print(requirements)

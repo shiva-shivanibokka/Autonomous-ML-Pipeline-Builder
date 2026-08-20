@@ -29,9 +29,12 @@ export interface RunParams {
 export default function ControlPanel({
   running,
   onRun,
+  replayOnly = false,
 }: {
   running: boolean;
   onRun: (p: RunParams) => void;
+  /** No backend is reachable — the controls would fail, so don't offer them. */
+  replayOnly?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [upload, setUpload] = useState<UploadResponse | null>(null);
@@ -43,7 +46,7 @@ export default function ControlPanel({
   const [error, setError] = useState("");
 
   async function handleFile(file: File | undefined) {
-    if (!file) return;
+    if (!file || replayOnly) return;
     setError("");
     setUploading(true);
     setUpload(null);
@@ -56,7 +59,7 @@ export default function ControlPanel({
     }
   }
 
-  const canRun = !!upload && problem.trim().length >= 10 && !running;
+  const canRun = !replayOnly && !!upload && problem.trim().length >= 10 && !running;
 
   function submit() {
     if (!upload) return;
@@ -71,6 +74,52 @@ export default function ControlPanel({
 
   return (
     <div className="panel" style={{ padding: 22 }}>
+      {replayOnly && (
+        <div
+          style={{
+            border: "1px solid var(--border)",
+            borderLeft: "3px solid var(--running)",
+            borderRadius: 10,
+            padding: "14px 16px",
+            marginBottom: 20,
+            fontSize: 13.5,
+            lineHeight: 1.65,
+            color: "var(--muted)",
+          }}
+        >
+          <b style={{ color: "var(--fg, var(--text))" }}>
+            These controls need a backend, and this page does not have one.
+          </b>
+          <br />
+          The pipeline trains real models and runs model-written code in a
+          sandbox, so it cannot be a static site. Nothing here is disabled to
+          hide it — running your own dataset genuinely works, it just needs the
+          stack on your machine:
+          <div
+            className="mono"
+            style={{
+              background: "var(--bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 8,
+              padding: "9px 11px",
+              margin: "11px 0 9px",
+              fontSize: 12.5,
+              color: "var(--done)",
+              overflowX: "auto",
+            }}
+          >
+            git clone https://github.com/shiva-shivanibokka/Autonomous-ML-Pipeline-Builder
+            <br />
+            cd Autonomous-ML-Pipeline-Builder &amp;&amp; cp .env.example .env
+            <br />
+            docker compose up --build
+          </div>
+          Add your own API key to <span className="mono">.env</span>, open{" "}
+          <span className="mono">localhost:3000</span>, and any CSV with a target
+          column will run end to end.
+        </div>
+      )}
+
       {/* 1. Dataset */}
       <label className="field-label">
         1 · Dataset
@@ -86,11 +135,13 @@ export default function ControlPanel({
         role="button"
         tabIndex={0}
         onKeyDown={(e) => (e.key === "Enter" ? fileRef.current?.click() : null)}
-        className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-[10px] text-center"
+        className="mt-2 flex flex-col items-center justify-center rounded-[10px] text-center"
         style={{
           border: "1.5px dashed var(--border)",
           padding: "20px 16px",
           background: "var(--bg)",
+          cursor: replayOnly ? "not-allowed" : "pointer",
+          opacity: replayOnly ? 0.45 : 1,
         }}
       >
         <input
@@ -159,6 +210,7 @@ export default function ControlPanel({
         value={problem}
         onChange={(e) => setProblem(e.target.value)}
         rows={4}
+        disabled={replayOnly}
         placeholder="e.g. Predict which transactions are fraudulent. The target column is Class (0=normal, 1=fraud). Minimize false negatives."
         style={{ marginTop: 8, resize: "vertical" }}
       />
@@ -193,6 +245,7 @@ export default function ControlPanel({
         type="password"
         value={apiKey}
         onChange={(e) => setApiKey(e.target.value)}
+        disabled={replayOnly}
         placeholder="API key — sent once over HTTPS, never stored"
         style={{ marginTop: 8 }}
       />
@@ -203,13 +256,17 @@ export default function ControlPanel({
         disabled={!canRun}
         onClick={submit}
       >
-        {running ? "Pipeline running…" : "Build the pipeline"}
+        {replayOnly
+          ? "Run it locally to build a pipeline"
+          : running
+            ? "Pipeline running…"
+            : "Build the pipeline"}
       </button>
 
       {error && (
         <div style={{ color: "var(--error)", fontSize: 14, marginTop: 12 }}>{error}</div>
       )}
-      {!upload && !error && (
+      {!upload && !error && !replayOnly && (
         <div style={{ color: "var(--faint)", fontSize: 13, marginTop: 12 }}>
           Bring your own API key — the agents call your chosen provider directly.
         </div>

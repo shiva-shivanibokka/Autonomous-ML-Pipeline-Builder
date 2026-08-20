@@ -94,6 +94,120 @@ class _Justification(BaseModel):
     justification: str = Field(description="2-3 sentence explanation")
 
 
+def _positive_class_values(shap_values):
+    """
+    Reduce SHAP output to one (samples x features) matrix.
+
+    Older SHAP returned a list, one array per class, and the code sliced
+    `[1]`. Newer SHAP returns a single (samples, features, classes) ndarray
+    instead — which is not a list, so the slice never ran and a 3-D array
+    reached summary_plot. summary_plot reads 3-D as *interaction* values and
+    silently drew a one-feature interaction chart instead of the ranked
+    feature-importance summary the report claims to show. It looked like a
+    plot, so nothing flagged it.
+    """
+    import numpy as np
+
+    if isinstance(shap_values, list):
+        shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+
+    arr = np.asarray(shap_values)
+    if arr.ndim == 3:
+        # (samples, features, classes) — take the positive class.
+        arr = arr[:, :, 1] if arr.shape[2] > 1 else arr[:, :, 0]
+    return arr
+
+
+# ── SHAP plot styling ─────────────────────────────────────────────────────────
+# Matches web/app/globals.css so the plot reads as part of the console rather
+# than a white rectangle pasted into a dark page. Kept here, next to the code
+# that draws it, because these are the only values that need to agree.
+_PLOT_BG = "#131926"      # --panel
+_PLOT_INK = "#e6edf6"     # --text
+_PLOT_MUTED = "#8a9bb8"   # --muted
+_PLOT_GRID = "#22304a"    # --border
+_PLOT_ACCENT = "#35d0ba"  # --done, the brand teal
+_PLOT_WARM = "#ffb84d"    # --running
+
+
+def _shap_colormap():
+    """
+    Low-to-high feature value, in the console's own two accents.
+
+    SHAP's default is blue-to-red, which is legible but belongs to a different
+    design. Teal-to-amber carries the same ordering and matches the agent state
+    colours used everywhere else in the UI.
+    """
+    from matplotlib.colors import LinearSegmentedColormap
+
+    return LinearSegmentedColormap.from_list(
+        "console", [_PLOT_ACCENT, "#7ea8b8", _PLOT_WARM]
+    )
+
+
+def _render_shap_plot(shap, plt, shap_values, features, feature_names, path) -> None:
+    """Draw the SHAP summary in the console's palette and save it."""
+    rc = {
+        "figure.facecolor": _PLOT_BG,
+        "axes.facecolor": _PLOT_BG,
+        "savefig.facecolor": _PLOT_BG,
+        "text.color": _PLOT_INK,
+        "axes.labelcolor": _PLOT_MUTED,
+        "xtick.color": _PLOT_MUTED,
+        "ytick.color": _PLOT_MUTED,
+        "axes.edgecolor": _PLOT_GRID,
+        "grid.color": _PLOT_GRID,
+        "font.size": 11,
+    }
+    with plt.rc_context(rc):
+        plt.figure(figsize=(10, 6))
+        try:
+            shap.summary_plot(
+                shap_values,
+                features,
+                feature_names=feature_names,
+                show=False,
+                cmap=_shap_colormap(),
+                max_display=15,
+            )
+        except TypeError:
+            # Older shap builds reject cmap on some plot types.
+            shap.summary_plot(
+                shap_values, features, feature_names=feature_names, show=False
+            )
+
+        ax = plt.gca()
+        ax.set_facecolor(_PLOT_BG)
+        ax.figure.set_facecolor(_PLOT_BG)
+        # SHAP draws its own axis furniture in matplotlib defaults (black text,
+        # a white colorbar). Recolour whatever it made rather than fighting it
+        # with rcParams alone.
+        for spine in ax.spines.values():
+            spine.set_color(_PLOT_GRID)
+        ax.tick_params(colors=_PLOT_MUTED, labelsize=10)
+        ax.xaxis.label.set_color(_PLOT_MUTED)
+        ax.yaxis.label.set_color(_PLOT_MUTED)
+        ax.grid(axis="x", color=_PLOT_GRID, alpha=0.35, linewidth=0.8)
+        ax.set_axisbelow(True)
+        for line in ax.get_lines():  # the zero reference line
+            line.set_color(_PLOT_GRID)
+        for txt in ax.texts:
+            txt.set_color(_PLOT_MUTED)
+        for bar in getattr(ax, "patches", []):
+            bar.set_color(_PLOT_ACCENT)
+
+        for cbar_ax in ax.figure.axes[1:]:  # the feature-value colorbar
+            cbar_ax.set_facecolor(_PLOT_BG)
+            cbar_ax.tick_params(colors=_PLOT_MUTED, labelsize=9)
+            cbar_ax.yaxis.label.set_color(_PLOT_MUTED)
+            for spine in cbar_ax.spines.values():
+                spine.set_color(_PLOT_GRID)
+
+        plt.tight_layout()
+        plt.savefig(path, dpi=150, bbox_inches="tight", facecolor=_PLOT_BG)
+        plt.close("all")
+
+
 def _run_shap(
     pipeline: Any,
     X_test: pd.DataFrame,
@@ -133,23 +247,13 @@ def _run_shap(
             explainer = shap.KernelExplainer(predict_fn, background)
             shap_values = explainer.shap_values(Xt[:50])
 
-        # Multi-class → take the positive/second class slice.
-        if isinstance(shap_values, list):
-            shap_values = shap_values[1] if len(shap_values) > 1 else shap_values[0]
+        shap_values = _positive_class_values(shap_values)
 
-        plt.figure(figsize=(10, 6))
-        shap.summary_plot(
-            shap_values,
-            Xt[: len(shap_values)],
-            feature_names=feature_names,
-            plot_type="bar",
-            show=False,
-        )
-        plt.tight_layout()
         os.makedirs(output_dir, exist_ok=True)
         plot_path = os.path.join(output_dir, "shap_summary.png")
-        plt.savefig(plot_path, dpi=150, bbox_inches="tight")
-        plt.close()
+        _render_shap_plot(
+            shap, plt, shap_values, Xt[: len(shap_values)], feature_names, plot_path
+        )
         return plot_path
 
     except Exception as exc:
