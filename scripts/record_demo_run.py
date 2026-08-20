@@ -119,6 +119,28 @@ def main() -> int:
         print(f"No such CSV: {csv_path}")
         return 2
 
+    # Check the execution gate up front. The Feature Engineer runs generated
+    # code, and without a backend it raises — but only after the Orchestrator
+    # and Data Analyst have already made their LLM calls. Failing here costs
+    # nothing instead of two paid calls.
+    from core.config import settings
+
+    use_e2b = settings.execution_backend == "e2b" and bool(settings.e2b_api_key.strip())
+    if not use_e2b and not settings.allow_local_exec:
+        print(
+            "Generated code has nowhere to run, and the pipeline needs it at the\n"
+            "Feature Engineer step. Pick one:\n\n"
+            "  Run it on this machine (simplest; it is your own code and repo,\n"
+            "  but it does execute model-written Python locally):\n"
+            "      PowerShell:  $env:ALLOW_LOCAL_EXEC='true'; "
+            "$env:EXECUTION_BACKEND='subprocess'\n"
+            "      bash:        export ALLOW_LOCAL_EXEC=true "
+            "EXECUTION_BACKEND=subprocess\n\n"
+            "  Or use an isolated cloud sandbox - set E2B_API_KEY "
+            "(https://e2b.dev)."
+        )
+        return 2
+
     df = pd.read_csv(csv_path)
     pipeline_id = "demo"
     output_dir = ROOT / "outputs" / pipeline_id
