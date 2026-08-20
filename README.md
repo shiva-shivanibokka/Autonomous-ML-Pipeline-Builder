@@ -99,11 +99,37 @@ Real capabilities exercised in this repo (mapped to how they're usually named), 
 
 Exact pinned versions are in [`requirements.txt`](requirements.txt) and [`web/package.json`](web/package.json).
 
-## Getting started (local)
+## Run it locally
+
+Two ways. Docker is the short one.
+
+### Option A — the whole stack, one command (recommended)
+
+**Prerequisites:** Docker Desktop, and an LLM API key (Anthropic / OpenAI / Groq).
+
+```bash
+cp .env.example .env          # add your API key
+docker compose up --build
+```
+
+| | |
+|---|---|
+| App | http://localhost:3000 |
+| API docs | http://localhost:8000/docs |
+| MLflow UI | http://localhost:5001 |
+
+Open the app, drop in a CSV, describe the goal, watch the agents run. `Ctrl+C`
+to stop, `docker compose down -v` to also discard the volumes.
+
+You need no Python or Node toolchain on your machine, and generated code runs in
+the API container's own subprocess sandbox rather than on your host — which is
+why `ALLOW_LOCAL_EXEC` defaults to true in `docker-compose.yml` and nowhere else.
+
+### Option B — run the pieces directly
 
 **Prerequisites:** Python 3.11, Node 20+, and an LLM API key (Anthropic / OpenAI / Groq).
 
-### Backend
+**Backend**
 
 ```bash
 cp .env.example .env            # add your API key(s)
@@ -117,7 +143,7 @@ uvicorn api.main:app --reload --port 8000
 
 > Security note: `ALLOW_LOCAL_EXEC=true` runs LLM-generated code on your machine and is for **local dev only**. In production the app requires an [E2B](https://e2b.dev) sandbox key and refuses to boot otherwise.
 
-### Frontend
+**Frontend**
 
 ```bash
 cd web
@@ -127,8 +153,6 @@ npm run dev                        # http://localhost:3000
 ```
 
 Open http://localhost:3000, drop in a CSV, describe the goal, and watch the agents run.
-
-> **Full Docker stack** (API + MLflow tracking server): `docker-compose up --build`.
 
 ## Usage (API)
 
@@ -174,6 +198,44 @@ deploy/        # Cloud Run deploy script + runbook
 docs/adr/      # architecture decision records
 tests/         # pytest suite
 ```
+
+## The hosted console is a replay
+
+The backend is a long-lived container that needs an LLM key per run and a paid
+sandbox, so it is not hosted anywhere (see [Deployment](#deployment)). The
+console still is: it replays **one real recorded run** as static files, with a
+banner saying so, the recording date, the dataset, and the real duration it was
+compressed from. Every log line, metric, SHAP plot and generated file came out
+of an actual run — nothing on that page is simulated, and no pipeline is
+executing while you watch it.
+
+### Record a run
+
+```bash
+python scripts/record_demo_run.py   --csv data/your_dataset.csv   --problem "Predict which customers churn. The target column is Churn."   --provider anthropic --api-key $ANTHROPIC_API_KEY
+```
+
+That runs the real pipeline and writes `web/public/demo/run.json` (progress
+timeline + full log stream + final result) plus `web/public/demo/artifacts/`
+(the `pipeline.py`, `model.pkl`, `Dockerfile`, SHAP plot and the rest it
+produced). Commit both. A failed run is not recorded.
+
+### Publish it
+
+Import the repo on Vercel as a **git-connected project** — not a CLI one-off, so
+every push to `main` redeploys:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `web` |
+| `NEXT_PUBLIC_DEMO_MODE` | `1` |
+| `NEXT_PUBLIC_API_BASE_URL` | leave unset |
+
+With `NEXT_PUBLIC_DEMO_MODE=1` the console autoplays the recording instead of
+reaching for an API that is not there. Locally it stays off, and the replay is a
+button next to the live controls.
+
+If a recording is ever missing, the page says so rather than inventing one.
 
 ## Deployment
 

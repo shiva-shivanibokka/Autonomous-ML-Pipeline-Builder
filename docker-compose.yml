@@ -1,9 +1,16 @@
-# Local development stack: FastAPI backend + MLflow tracking server.
-# (Production is Cloud Run for the API + Vercel for the frontend — see deploy/README.md.)
+# The whole stack, locally: frontend + FastAPI backend + MLflow tracking server.
+# This is the supported way to run the project — one command, no Python or Node
+# toolchain needed on the host.
 #
-#   docker-compose up --build
+#   docker compose up --build
+#   App:       http://localhost:3000
 #   API docs:  http://localhost:8000/docs
 #   MLflow UI: http://localhost:5001
+#
+# Generated code runs in the API container's own subprocess sandbox, not on your
+# machine. That is why ALLOW_LOCAL_EXEC defaults to true here and nowhere else.
+# (Hosted, the API goes to Cloud Run and the frontend to Vercel — see
+# deploy/README.md.)
 
 services:
   mlflow:
@@ -55,6 +62,24 @@ services:
       interval: 15s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # NEXT_PUBLIC_* are inlined at build time, so this is a build arg, not
+        # a runtime environment variable. localhost, not the compose service
+        # name: the browser makes these calls, and it resolves names on your
+        # machine, not inside the compose network.
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+        NEXT_PUBLIC_DEMO_MODE: ${NEXT_PUBLIC_DEMO_MODE:-0}
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_healthy
     restart: unless-stopped
 
 volumes:

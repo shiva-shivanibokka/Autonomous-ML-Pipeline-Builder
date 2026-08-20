@@ -1,3 +1,4 @@
+import { DEMO_PIPELINE_ID } from "./demo";
 import type {
   LogsResponse,
   Provider,
@@ -63,5 +64,8 @@ export async function getResult(id: string): Promise<ResultResponse> {
 }
 
 export function artifactUrl(id: string, file: string): string {
+  // A replayed run has no backend behind it — its artifacts are the real files
+  // the recorded run produced, served statically alongside the page.
+  if (id === DEMO_PIPELINE_ID) return `/demo/artifacts/${file}`;
   return `${API_BASE}/pipeline/${id}/artifacts/${file}`;
 }

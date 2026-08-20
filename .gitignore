@@ -41,6 +41,11 @@ runs.db
 *.pt
 *.pth
 
+# ...except the recorded demo run's artifacts, which are the whole point of
+# web/public/demo/ and have to ship. Without this, `*.pkl` and `*.csv` above
+# silently dropped model.pkl from the recording and the download link 404'd.
+!web/public/demo/artifacts/**
+
 # Data files (large CSVs)
 *.csv
 

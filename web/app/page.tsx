@@ -6,6 +6,14 @@ import AgentRail, { type AgentState, type RailAgent } from "@/components/AgentRa
 import LogConsole from "@/components/LogConsole";
 import ResultsPanel from "@/components/ResultsPanel";
 import { API_BASE, getLogs, getResult, getStatus, runPipeline } from "@/lib/api";
+import {
+  DEMO_MODE,
+  DEMO_PIPELINE_ID,
+  REPLAY_SECONDS,
+  loadDemoRun,
+  playDemoRun,
+  type DemoRun,
+} from "@/lib/demo";
 import { AGENTS, type ResultResponse, type RunStatus } from "@/lib/types";
 
 function deriveAgents(currentStep: string, status: RunStatus): RailAgent[] {
@@ -97,6 +105,47 @@ export default function Home() {
     }
   }
 
+  // ── Replay of a recorded run ────────────────────────────────────────────
+  const [demoRun, setDemoRun] = useState<DemoRun | null>(null);
+  const [demoChecked, setDemoChecked] = useState(false);
+  const stopReplay = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    loadDemoRun().then((run) => {
+      setDemoRun(run);
+      setDemoChecked(true);
+    });
+  }, []);
+
+  // Never leave an interval writing into unmounted state.
+  useEffect(() => () => stopReplay.current?.(), []);
+
+  const startReplay = useCallback(() => {
+    if (!demoRun) return;
+    stopPolling();
+    stopReplay.current?.();
+    setRunError("");
+    setResult(null);
+    setLogs([]);
+    setStatus("pending");
+    setCurrentStep("orchestrator");
+    setPipelineId(DEMO_PIPELINE_ID);
+    stopReplay.current = playDemoRun(demoRun, {
+      onFrame: (s, step, lines) => {
+        setStatus(s);
+        setCurrentStep(step);
+        setLogs(lines);
+      },
+      onDone: (r) => setResult(r),
+    });
+  }, [demoRun, stopPolling]);
+
+  // On a hosted build there is no backend to talk to, so play automatically.
+  useEffect(() => {
+    if (DEMO_MODE && demoRun && !started) startReplay();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demoRun]);
+
   const agents = started
     ? deriveAgents(currentStep, status)
     : AGENTS.map((a) => ({ ...a, state: "pending" as AgentState }));
@@ -140,6 +189,12 @@ export default function Home() {
           explains the winner with SHAP, and hands you a runnable FastAPI + Docker bundle.
         </p>
       </section>
+
+      {/* What you are looking at — shown whenever a recording is available,
+          so a replay is never mistaken for a live pipeline. */}
+      {demoChecked && (demoRun || DEMO_MODE) && (
+        <ReplayBanner run={demoRun} onReplay={startReplay} playing={running} />
+      )}
 
       {/* Workspace */}
       <section
@@ -202,5 +257,64 @@ function StatusChip({ status }: { status: RunStatus | "idle" }) {
       <span style={{ width: 7, height: 7, borderRadius: "50%", background: c }} />
       {t}
     </span>
+  );
+}
+
+function ReplayBanner({
+  run,
+  onReplay,
+  playing,
+}: {
+  run: DemoRun | null;
+  onReplay: () => void;
+  playing: boolean;
+}) {
+  const box = {
+    border: "1px solid var(--border)",
+    borderRadius: 12,
+    padding: "16px 18px",
+    marginTop: 8,
+    background: "var(--panel)",
+    display: "flex",
+    gap: 16,
+    alignItems: "center",
+    flexWrap: "wrap" as const,
+    justifyContent: "space-between",
+  };
+
+  if (!run) {
+    return (
+      <div style={box}>
+        <div style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.6 }}>
+          <b style={{ color: "var(--fg)" }}>No recorded run is committed yet.</b>{" "}
+          The backend is not hosted — it needs an LLM key and a sandbox — so this
+          page can only replay a run captured locally. Capture one with{" "}
+          <code className="mono">python scripts/record_demo_run.py</code>.
+        </div>
+      </div>
+    );
+  }
+
+  const mins = Math.round(run.duration_seconds / 6) / 10;
+
+  return (
+    <div style={box}>
+      <div style={{ fontSize: 13.5, color: "var(--muted)", lineHeight: 1.7, maxWidth: 780 }}>
+        <b style={{ color: "var(--fg)" }}>This is a replay of one real run</b> —
+        recorded {run.recorded_at.slice(0, 10)} on{" "}
+        <span className="mono">{run.dataset.name}</span> (
+        {run.dataset.n_rows.toLocaleString()} rows × {run.dataset.n_cols} cols) using{" "}
+        <span className="mono">{run.model_name}</span>. Every log line, metric, SHAP
+        plot and generated file below came out of that run; nothing is simulated.
+        <br />
+        The pipeline is not running now: the backend is a long-lived container that
+        needs your own API key, so it is not hosted. It took{" "}
+        <b style={{ color: "var(--fg)" }}>{mins} min</b> in reality, compressed to{" "}
+        {REPLAY_SECONDS}s here. Clone the repo to run it for real.
+      </div>
+      <button className="btn-primary" onClick={onReplay} disabled={playing}>
+        {playing ? "Replaying…" : "Replay the run"}
+      </button>
+    </div>
   );
 }
