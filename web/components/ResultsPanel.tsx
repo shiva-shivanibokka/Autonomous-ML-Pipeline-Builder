@@ -152,14 +152,29 @@ export default function ResultsPanel({
       {result.has_shap_plot && (
         <div className="panel" style={{ padding: 20 }}>
           <div className="eyebrow">Feature importance (SHAP · held-out test set)</div>
-          <div style={{ marginTop: 12, background: "#fff", borderRadius: 8, padding: 8 }}>
+          <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "9px 0 0", lineHeight: 1.6 }}>
+            Each dot is one held-out row. Position is how much that feature pushed
+            the prediction; colour is the feature&apos;s own value, low to high.
+          </p>
+          {/* The plot is rendered in this palette by agents/evaluator.py, so it
+              needs no white card to sit on — it is part of the panel. */}
+          <div
+            style={{
+              marginTop: 12,
+              background: "var(--panel)",
+              border: "1px solid var(--border)",
+              borderRadius: 10,
+              padding: 6,
+              overflow: "hidden",
+            }}
+          >
             <Image
               src={artifactUrl(pipelineId, "shap_summary.png")}
-              alt="SHAP feature importance summary"
+              alt="SHAP feature importance summary for the winning model"
               width={900}
               height={540}
               unoptimized
-              style={{ width: "100%", height: "auto", borderRadius: 4 }}
+              style={{ width: "100%", height: "auto", borderRadius: 6, display: "block" }}
             />
           </div>
         </div>
