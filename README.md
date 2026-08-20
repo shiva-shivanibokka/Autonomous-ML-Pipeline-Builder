@@ -11,7 +11,7 @@
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
 > - **Hardest problem solved:** eliminating train/test **data leakage** across the whole flow (preprocessing is a scikit-learn `Pipeline` fit on the training fold only) *and* shipping a **runnable** artifact — the full pipeline serializes to `model.pkl`, so the generated FastAPI service predicts on raw input with zero training/serving skew.
-> - **Production concerns are addressed, not gestured at:** 78 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), a Docker image built on every push, and a Cloud Run + Vercel deployment path with a documented runbook.
+> - **Production concerns are addressed, not gestured at:** 83 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), a Docker image built on every push, and a Cloud Run + Vercel deployment path with a documented runbook.
 
 A LangGraph crew of seven agents plans the approach, profiles the data, engineers leakage-safe features, trains and cross-validates several models in parallel, explains the winner with SHAP, and emits a runnable FastAPI + Docker inference bundle. A Next.js console streams every agent's work in real time.
 
@@ -105,7 +105,7 @@ Real capabilities exercised in this repo (mapped to how they're usually named), 
 | **Application security** | Server-issued upload IDs (no arbitrary file read), sandboxed execution, no stored keys, CORS allowlist, fail-loud prod boot |
 | **Containerization & CI/CD** | Non-root Dockerfile built in CI, GitHub Actions (lint + test + image build + frontend build) |
 | **Cloud-native deployment (GCP Cloud Run · Vercel)** | Deploy script + runbook (`deploy/`) — configured, not yet live |
-| **Automated testing** | 78 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
+| **Automated testing** | 83 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
 | **Frontend engineering** | Next.js (App Router) + TypeScript console with live streaming (`web/`) |
 
 ## Tech stack
@@ -202,7 +202,7 @@ curl -O http://localhost:8000/pipeline/<pipeline_id>/artifacts/model.pkl
 
 ```bash
 pip install -r requirements-dev.txt
-ALLOW_LOCAL_EXEC=true pytest -q          # 78 tests (1 skips without the E2B extra)
+ALLOW_LOCAL_EXEC=true pytest -q          # 83 tests (1 skips without the E2B extra)
 ruff check .                             # lint
 ```
 
@@ -284,6 +284,15 @@ console that quietly hammers `localhost:8000` on someone else's machine.
 
 If a recording is ever missing, the page says so rather than inventing one.
 
+### What the hosted page will not let you do
+
+The Setup tab's controls are inert there, and say why. Uploading a CSV and
+running a pipeline needs a backend, and a replay has none — leaving the form
+live would point it at `http://localhost:8000`, which on a hosted page means
+*the visitor's own machine*, and hand them a connection error. Running your own
+dataset genuinely works; it just needs [the stack on your
+machine](#run-it-locally), which the panel spells out in three commands.
+
 ## Deploying it yourself
 
 The backend is **not hosted here**, and that is a decision rather than an omission: it needs an LLM key per run, a paid sandbox, ~2 GiB of memory, and multi-minute jobs that no free serverless tier will hold. A public instance would either bill the author for every visitor's training run or ask strangers to paste their own keys into someone else's server.
@@ -354,3 +363,7 @@ Publish the frontend alone in replay mode. It costs nothing, never expires, and 
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+---
+
+Built by **Shivani Bokka** · [github.com/shiva-shivanibokka](https://github.com/shiva-shivanibokka)

@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import InfoTip from "@/components/InfoTip";
 import { artifactUrl } from "@/lib/api";
 import { ARTIFACTS, type ComparisonRow, type ResultResponse } from "@/lib/types";
 
@@ -45,8 +46,9 @@ export default function ResultsPanel({
           boxShadow: "0 0 0 1px rgba(53,208,186,0.25), 0 0 40px rgba(53,208,186,0.08)",
         }}
       >
-        <div className="eyebrow" style={{ color: "var(--done)" }}>
+        <div className="eyebrow" style={{ color: "var(--done)", display: "inline-flex", alignItems: "center" }}>
           Winning model
+          <InfoTip text="Picked by argmax on the primary metric, not by asking the model which it liked. The LLM only writes the justification underneath, after the decision is already made. Metrics are measured on a held-out 20% test split the models never saw." />
         </div>
         <div style={{ display: "flex", alignItems: "baseline", gap: 14, flexWrap: "wrap", marginTop: 6 }}>
           <span style={{ fontSize: 28, fontWeight: 600 }}>
@@ -65,7 +67,15 @@ export default function ResultsPanel({
         )}
         {/* metric tiles */}
         {result.metrics && (
-          <div className="mt-4 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))" }}>
+          <>
+            <div
+              className="field-label"
+              style={{ display: "inline-flex", alignItems: "center", marginTop: 18 }}
+            >
+              Test-set metrics
+              <InfoTip text="Measured on the held-out 20%. AUC is how well the model ranks a churner above a non-churner (0.5 is a coin flip, 1.0 is perfect). Precision is how often a churn prediction is right; recall is how many real churners it caught; F1 balances the two. Recall matters most here because the goal said a missed churner costs more than a false alarm." />
+            </div>
+            <div className="mt-2 grid gap-2" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(96px, 1fr))" }}>
             {Object.entries(result.metrics).map(([k, v]) => (
               <div
                 key={k}
@@ -81,8 +91,9 @@ export default function ResultsPanel({
                 </div>
                 <div className="mono" style={{ fontSize: 17, marginTop: 2 }}>{v}</div>
               </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          </>
         )}
       </div>
 
@@ -92,7 +103,10 @@ export default function ResultsPanel({
           className="panel"
           style={{ padding: 16, borderColor: "var(--running)" }}
         >
-          <div className="eyebrow" style={{ color: "var(--running)" }}>Fairness check</div>
+          <div className="eyebrow" style={{ color: "var(--running)", display: "inline-flex", alignItems: "center" }}>
+            Fairness check
+            <InfoTip text="Flags columns that look like protected attributes (gender, race, age, and similar) when the model was trained on them. It is a prompt to go and measure disparate impact - it does not measure it for you, and a clean check does not mean the model is fair." />
+          </div>
           <ul style={{ margin: "8px 0 0", paddingLeft: 18, color: "var(--muted)", fontSize: 13.5 }}>
             {result.bias_warnings.map((w, i) => (
               <li key={i} style={{ marginBottom: 4 }}>{w}</li>
@@ -104,7 +118,10 @@ export default function ResultsPanel({
       {/* Comparison table */}
       {result.comparison_table.length > 0 && (
         <div className="panel" style={{ padding: 20 }}>
-          <div className="eyebrow">Model comparison</div>
+          <div className="eyebrow" style={{ display: "inline-flex", alignItems: "center" }}>
+            Model comparison
+            <InfoTip text="Every model trained in parallel on the same split. 'cv' is the k-fold cross-validation mean, with preprocessing re-fit inside each fold so nothing leaks from the validation data. 'time' is fit time in seconds - relevant because the fastest model here also won." />
+          </div>
           <div style={{ overflowX: "auto", marginTop: 12 }}>
             <table className="mono" style={{ width: "100%", borderCollapse: "collapse", fontSize: 12.5 }}>
               <thead>
@@ -151,7 +168,10 @@ export default function ResultsPanel({
       {/* SHAP */}
       {result.has_shap_plot && (
         <div className="panel" style={{ padding: 20 }}>
-          <div className="eyebrow">Feature importance (SHAP · held-out test set)</div>
+          <div className="eyebrow" style={{ display: "inline-flex", alignItems: "center" }}>
+            Feature importance (SHAP · held-out test set)
+            <InfoTip text="Computed on rows the model never trained on, so it shows how the model generalises rather than what it memorised. The winning Pipeline transforms the raw test features first, then SHAP explains the model step - which is why feature names carry their cat__ / num__ preprocessing prefix." />
+          </div>
           <p style={{ color: "var(--muted)", fontSize: 13.5, margin: "9px 0 0", lineHeight: 1.6 }}>
             Each dot is one held-out row. Position is how much that feature pushed
             the prediction; colour is the feature&apos;s own value, low to high.
@@ -182,7 +202,10 @@ export default function ResultsPanel({
 
       {/* Artifacts */}
       <div className="panel" style={{ padding: 20 }}>
-        <div className="eyebrow">Generated artifacts</div>
+        <div className="eyebrow" style={{ display: "inline-flex", alignItems: "center" }}>
+          Generated artifacts
+          <InfoTip text="Everything needed to serve this model, written by the agents during the run. model.pkl is the whole pipeline - preprocessing and estimator together - so the service predicts from raw input with no separate preprocessing step to drift out of sync." />
+        </div>
         <p style={{ color: "var(--muted)", fontSize: 13, margin: "8px 0 14px" }}>
           A runnable, self-contained deployment bundle — the saved pipeline predicts on
           raw input, no manual preprocessing to keep in sync.

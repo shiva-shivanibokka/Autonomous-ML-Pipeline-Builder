@@ -315,6 +315,34 @@ export default function Home() {
         </section>
       )}
 
+      <footer
+        style={{
+          marginTop: 56,
+          paddingTop: 22,
+          borderTop: "1px solid var(--border)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 16,
+          flexWrap: "wrap",
+          color: "var(--faint)",
+          fontSize: 13,
+        }}
+      >
+        <span>
+          Built by <span style={{ color: "var(--muted)" }}>Shivani Bokka</span>
+        </span>
+        <a
+          href="https://github.com/shiva-shivanibokka/Autonomous-ML-Pipeline-Builder"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="mono"
+          style={{ color: "var(--faint)", fontSize: 12.5, textDecoration: "none" }}
+        >
+          view source ↗
+        </a>
+      </footer>
+
       <style>{`
         @media (max-width: 1100px) {
           .workspace { grid-template-columns: 1fr !important; }
