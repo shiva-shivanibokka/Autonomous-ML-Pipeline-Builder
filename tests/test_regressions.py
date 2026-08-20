@@ -335,3 +335,32 @@ def test_schema_prompts_still_demand_json():
     from agents.data_analyst import SYSTEM_PROMPT
 
     assert "valid JSON" in SYSTEM_PROMPT
+
+
+def test_trailing_fenced_block_after_the_module_is_cut():
+    """
+    Observed on a real run: the model wrote pipeline.py, then appended a fenced
+    list of pinned requirements. strip_fences only helps when a fence wraps the
+    whole reply, so the .py artifact carried a requirements block from line 499
+    and would not parse.
+    """
+    import ast
+
+    from core.llm_utils import extract_code
+
+    reply = (
+        "import os\n\n\ndef main():\n    return 1\n\n"
+        "```\nscikit-learn==1.3.0\nlightgbm==4.0.0\n```\n"
+    )
+    out = extract_code(reply)
+    ast.parse(out)  # raises if the fence survived
+    assert "scikit-learn==1.3.0" not in out
+    assert "def main" in out
+
+
+def test_a_module_that_already_parses_is_left_alone():
+    """Never cut working code — including a fence inside a docstring."""
+    from core.llm_utils import extract_code
+
+    src = 'def f():\n    """Usage:\n\n    ```\n    f()\n    ```\n    """\n    return 1\n'
+    assert extract_code(src).strip() == src.strip()

@@ -15,6 +15,7 @@ Usage:
 
 from __future__ import annotations
 
+import ast
 import json
 import logging
 import re
@@ -189,7 +190,7 @@ def extract_code(raw: str) -> str:
     """
     text = strip_fences(raw).strip()
     if not text.startswith("{"):
-        return text
+        return _drop_trailing_blocks(text)
     try:
         obj = json.loads(text)
     except ValueError:
@@ -197,7 +198,40 @@ def extract_code(raw: str) -> str:
     if isinstance(obj, dict):
         strings = [v for v in obj.values() if isinstance(v, str)]
         if strings:
-            return max(strings, key=len).strip()
+            return _drop_trailing_blocks(max(strings, key=len).strip())
+    return text
+
+
+def _drop_trailing_blocks(text: str) -> str:
+    """
+    Cut anything the model appended after the file itself.
+
+    `strip_fences` only helps when a fence wraps the *whole* reply. A model
+    that writes the module and then adds a fenced "and here are the pinned
+    requirements" block leaves the fence mid-file, and the .py artifact does
+    not parse — observed on a real run, where pipeline.py carried a
+    requirements list from line 499.
+
+    Only cuts when the text does not already parse, and only at a fence, and
+    only if cutting there yields something that does. A file that parses is
+    returned untouched, so a fence inside a docstring is never an issue.
+    """
+    try:
+        ast.parse(text)
+        return text
+    except SyntaxError:
+        pass
+
+    lines = text.splitlines()
+    for i, line in enumerate(lines):
+        if not line.lstrip().startswith("```"):
+            continue
+        candidate = "\n".join(lines[:i]).rstrip()
+        try:
+            ast.parse(candidate)
+        except SyntaxError:
+            continue
+        return candidate + "\n"
     return text
 
 

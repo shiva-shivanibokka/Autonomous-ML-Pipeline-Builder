@@ -10,11 +10,25 @@
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
 > - **Hardest problem solved:** eliminating train/test **data leakage** across the whole flow (preprocessing is a scikit-learn `Pipeline` fit on the training fold only) *and* shipping a **runnable** artifact — the full pipeline serializes to `model.pkl`, so the generated FastAPI service predicts on raw input with zero training/serving skew.
-> - **Production concerns are addressed, not gestured at:** 60 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), and a Cloud Run + Vercel deployment path with a documented runbook.
+> - **Production concerns are addressed, not gestured at:** 78 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), a Docker image built on every push, and a Cloud Run + Vercel deployment path with a documented runbook.
 
 A LangGraph crew of seven agents plans the approach, profiles the data, engineers leakage-safe features, trains and cross-validates several models in parallel, explains the winner with SHAP, and emits a runnable FastAPI + Docker inference bundle. A Next.js console streams every agent's work in real time.
 
-> **Live demo:** not yet deployed — the deployment path (Cloud Run + Vercel) is fully configured with a step-by-step runbook in [deploy/README.md](deploy/README.md). Add demo URLs here once live.
+> **The console is published as a replay of one real run** — the backend needs an LLM key per run and a paid sandbox, so it is not hosted. Everything you see there came out of an actual pipeline run; see [The hosted console is a replay](#the-hosted-console-is-a-replay). To run it for real, [`docker compose up`](#run-it-locally) gives you the whole stack.
+
+### What one real run produced
+
+Telco customer churn, 7,043 rows × 21 columns, `claude-sonnet-5`, ~2 minutes end to end:
+
+| | |
+|---|---|
+| Models trained & cross-validated | `lightgbm`, `xgboost`, `random_forest`, `logistic_regression` |
+| Winner (chosen by argmax, not by asking the model) | **`random_forest`** — AUC **0.836** vs xgboost 0.8328, lightgbm 0.8322 |
+| Fairness | flagged `gender` as a sensitive feature before deployment |
+| Emitted | `model.pkl`, `pipeline.py`, `fastapi_endpoint.py`, `Dockerfile`, `requirements.txt`, `openapi_spec.json`, `feature_schema.json`, SHAP plot |
+| Verified after the fact | `model.pkl` loads as `Pipeline(['prep','model'])` and predicts on **raw, untouched CSV rows** — no manual preprocessing, no training/serving skew |
+
+The self-correction loop earned its keep in that run: the Feature Engineer's first sandboxed attempt failed, the traceback went back to the model, and the retry succeeded. It's in the log stream.
 
 ---
 
@@ -24,7 +38,7 @@ Most early-career ML projects are a notebook with a model that was never deploye
 
 - **No data leakage.** Preprocessing is a scikit-learn `Pipeline` fit on the training fold only, validated with k-fold cross-validation. ([ADR 0002](docs/adr/0002-leakage-safe-pipeline.md))
 - **The output actually runs.** The winning pipeline (preprocessing + model) is serialized to `model.pkl`; the generated FastAPI service loads it and predicts on raw input — no training/serving skew.
-- **Built to deploy properly.** Non-root container for Cloud Run, static frontend for Vercel, secrets via Secret Manager, health checks, structured logs, and a Prometheus `/metrics` endpoint. (Config and runbook are in the repo; not yet stood up live.)
+- **Built to deploy properly.** Non-root container for Cloud Run — built and smoke-imported in CI on every push — static frontend for Vercel, secrets via Secret Manager, health checks, structured logs, and a Prometheus `/metrics` endpoint.
 - **Retrieval-grounded agents.** The code-generating agents retrieve from a curated ML best-practices knowledge base (RAG) instead of relying on parametric memory alone.
 - **Hardened.** No arbitrary file reads, generated code never runs on the host in production (isolated E2B sandbox), API keys are never stored, CORS is locked down, and the app refuses to boot if production is misconfigured.
 
@@ -88,7 +102,7 @@ Real capabilities exercised in this repo (mapped to how they're usually named), 
 | **Application security** | Server-issued upload IDs (no arbitrary file read), sandboxed execution, no stored keys, CORS allowlist, fail-loud prod boot |
 | **Containerization & CI/CD** | Non-root Dockerfile built in CI, GitHub Actions (lint + test + image build + frontend build) |
 | **Cloud-native deployment (GCP Cloud Run · Vercel)** | Deploy script + runbook (`deploy/`) — configured, not yet live |
-| **Automated testing** | 60 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
+| **Automated testing** | 78 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
 | **Frontend engineering** | Next.js (App Router) + TypeScript console with live streaming (`web/`) |
 
 ## Tech stack
@@ -111,6 +125,13 @@ Two ways. Docker is the short one.
 cp .env.example .env          # add your API key
 docker compose up --build
 ```
+
+> **If a key in `.env` seems to be ignored, it is.** An environment variable
+> already set in your shell — or a Windows user-level variable from another
+> project — beats the file, which is standard but silent, and the symptom is a
+> `401` that looks exactly like a bad key. The app now prints
+> `Ignoring .env for ANTHROPIC_API_KEY …` when that happens. Unset the stale
+> variable and it will pick up the file.
 
 | | |
 |---|---|
@@ -178,7 +199,7 @@ curl -O http://localhost:8000/pipeline/<pipeline_id>/artifacts/model.pkl
 
 ```bash
 pip install -r requirements-dev.txt
-ALLOW_LOCAL_EXEC=true pytest -q          # 60 tests (1 skips without the E2B extra)
+ALLOW_LOCAL_EXEC=true pytest -q          # 78 tests (1 skips without the E2B extra)
 ruff check .                             # lint
 ```
 
@@ -194,7 +215,9 @@ sandbox/       # E2B / subprocess execution with a self-correction loop
 api/            # FastAPI app + schemas
 knowledge/     # ML best-practices corpus (RAG source)
 web/           # Next.js frontend (deploys to Vercel)
+web/public/demo/  # the recorded run the hosted console replays
 deploy/        # Cloud Run deploy script + runbook
+scripts/       # record_demo_run.py - captures a real run for the replay
 docs/adr/      # architecture decision records
 tests/         # pytest suite
 ```
@@ -202,23 +225,41 @@ tests/         # pytest suite
 ## The hosted console is a replay
 
 The backend is a long-lived container that needs an LLM key per run and a paid
-sandbox, so it is not hosted anywhere (see [Deployment](#deployment)). The
-console still is: it replays **one real recorded run** as static files, with a
-banner saying so, the recording date, the dataset, and the real duration it was
-compressed from. Every log line, metric, SHAP plot and generated file came out
-of an actual run — nothing on that page is simulated, and no pipeline is
-executing while you watch it.
+sandbox, so it is not hosted anywhere (see [Deploying it yourself](#deploying-it-yourself)).
+The console still is: it replays **one real recorded run** from static files,
+with a banner giving the recording date, the dataset, the model, and the real
+duration it was compressed from.
+
+Every log line, metric, SHAP plot and downloadable file on that page came out of
+an actual run. Nothing is simulated, no pipeline is executing while you watch,
+and the page says so plainly — a replay that pretended otherwise would be worth
+less than no demo at all.
+
+The recording committed here is the Telco churn run described [at the top of
+this file](#what-one-real-run-produced): 44 log lines, 9 progress frames, 122
+seconds compressed to 30, and the eight artifacts it emitted — including the
+7.4 MB `model.pkl`, which you can download from the page and load yourself.
 
 ### Record a run
 
 ```bash
-python scripts/record_demo_run.py   --csv data/your_dataset.csv   --problem "Predict which customers churn. The target column is Churn."   --provider anthropic --api-key $ANTHROPIC_API_KEY
+# The key can live in .env instead of the command line.
+export ALLOW_LOCAL_EXEC=true EXECUTION_BACKEND=subprocess
+python scripts/record_demo_run.py   --csv data/your_dataset.csv   --problem "Predict which customers churn. The target column is Churn."   --provider anthropic
 ```
+
+`ALLOW_LOCAL_EXEC` is required because the Feature Engineer runs generated code;
+the recorder checks for it up front rather than failing after two paid LLM
+calls. Set `E2B_API_KEY` instead to use the isolated cloud sandbox.
 
 That runs the real pipeline and writes `web/public/demo/run.json` (progress
 timeline + full log stream + final result) plus `web/public/demo/artifacts/`
 (the `pipeline.py`, `model.pkl`, `Dockerfile`, SHAP plot and the rest it
-produced). Commit both. A failed run is not recorded.
+produced). Commit both.
+
+Three things the recorder will not do: record a failed run, write a recording
+that contains your API key (it scans the payload and every artifact first), or
+copy an artifact over 20 MB into a static bundle.
 
 ### Publish it
 
@@ -237,11 +278,60 @@ button next to the live controls.
 
 If a recording is ever missing, the page says so rather than inventing one.
 
-## Deployment
+## Deploying it yourself
 
-Not yet deployed — there is no live URL for this project. The path is fully configured: backend → Cloud Run (non-root `Dockerfile`, built in CI), frontend → Vercel (`web/`). Step-by-step runbook — secrets, env, CORS wiring, rollback — in **[deploy/README.md](deploy/README.md)**.
+The backend is **not hosted here**, and that is a decision rather than an omission: it needs an LLM key per run, a paid sandbox, ~2 GiB of memory, and multi-minute jobs that no free serverless tier will hold. A public instance would either bill the author for every visitor's training run or ask strangers to paste their own keys into someone else's server.
 
-Standing it up needs accounts rather than code: a GCP project, an [E2B](https://e2b.dev) key (production refuses to boot without one), the secrets from the runbook, then `PROJECT_ID=… FRONTEND_ORIGIN=… ./deploy/deploy-cloudrun.sh`. The frontend is a Vercel import with **Root Directory = `web`** and `NEXT_PUBLIC_API_BASE_URL` pointed at the Cloud Run URL; put that Vercel URL in the backend's `ALLOWED_ORIGINS` to close the loop.
+If you have the accounts, the path is fully configured and nothing here needs writing — only running.
+
+### What it costs you
+
+| Piece | Where | What you need |
+|---|---|---|
+| Backend | Google Cloud Run | A GCP project with billing enabled. Card required; Always Free covers a demo's usage. |
+| Sandbox | [E2B](https://e2b.dev) | An API key. **Production refuses to boot without one** — it will not run model-written code on your server. |
+| LLM | Anthropic / OpenAI / Groq | Callers supply their own key per request; server-side keys are optional fallbacks. Groq has a free tier. |
+| Frontend | Vercel | Free Hobby account, no card. |
+
+### 1. Backend → Cloud Run
+
+```bash
+# One-time: create the secrets the runbook lists (at minimum E2B_API_KEY)
+PROJECT_ID=my-project \
+FRONTEND_ORIGIN=https://your-app.vercel.app \
+  ./deploy/deploy-cloudrun.sh
+```
+
+The script builds the `Dockerfile` via Cloud Build and deploys it non-root, mounting **only the secrets that exist** — so a missing optional `OPENAI_API_KEY` no longer fails the whole deploy. It prints the service URL when done.
+
+Two things happen automatically that are worth knowing about:
+
+- **`APP_ENV=production` makes the app fail loudly on a bad config** — it refuses to start with host code execution enabled, or with `ALLOWED_ORIGINS=*`. Misconfiguration is a crash on boot, not a quiet security hole.
+- **`.gcloudignore` keeps the upload small.** `gcloud` does not read `.dockerignore`, and without this file it would ship ~370 MB of frontend `node_modules` to Cloud Build for an image that never uses them.
+
+Full runbook — secrets, IAM, configuration reference, rollback — in **[deploy/README.md](deploy/README.md)**.
+
+### 2. Frontend → Vercel
+
+Import the repo as a git-connected project so every push redeploys:
+
+| Setting | Value |
+|---|---|
+| Root Directory | `web` |
+| `NEXT_PUBLIC_API_BASE_URL` | your Cloud Run URL |
+| `NEXT_PUBLIC_DEMO_MODE` | `0` (or unset) |
+
+### 3. Close the loop
+
+Set the backend's `ALLOWED_ORIGINS` to the exact Vercel URL and redeploy the service. CORS is an explicit allowlist in production — a wildcard is refused at boot.
+
+### Not using Cloud Run?
+
+The backend is a plain container that reads `$PORT`, so anything that runs a long-lived Docker image works — Fly, Render, Railway, a VM behind nginx. Two requirements are non-negotiable regardless of host: **at least ~2 GiB of memory** (LightGBM + XGBoost + SHAP), and **a request timeout long enough for a multi-minute job**, or the run must be polled rather than awaited — which is what `/pipeline/{id}/status` already does.
+
+### Don't want to host the backend at all?
+
+Publish the frontend alone in replay mode. It costs nothing, never expires, and still shows the whole system working — see [The hosted console is a replay](#the-hosted-console-is-a-replay).
 
 ## Roadmap / known limitations
 
@@ -252,9 +342,8 @@ Standing it up needs accounts rather than code: a GCP project, an [E2B](https://
   verifies the security gate, the pinned SDK's call surface, and how a failed
   execution is rendered — but nothing in CI actually talks to a sandbox. Running one
   pipeline with a real E2B key is the remaining gap.
-- **No live end-to-end run is recorded.** Every layer below the API is unit-tested and
-  CI builds the image, but the LLM-dependent agents have not been exercised together
-  against a real key in a way this repo can prove.
+- **Cold starts.** A Cloud Run instance that has scaled to zero pays ~10-20s of
+  container start before the first request, and the run store resets with it.
 
 ## License
 

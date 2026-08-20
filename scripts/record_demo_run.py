@@ -31,6 +31,7 @@ sys.path.insert(0, str(ROOT))
 
 import pandas as pd  # noqa: E402
 
+from core.providers import PROVIDER_DEFAULTS  # noqa: E402
 from pipeline.runner import run_pipeline_streaming  # noqa: E402
 
 DEMO_DIR = ROOT / "web" / "public" / "demo"
@@ -194,7 +195,11 @@ def main() -> int:
         "dataset": {"name": csv_path.name, "n_rows": len(df), "n_cols": len(df.columns)},
         "business_problem": args.problem,
         "provider": args.provider,
-        "model_name": args.model or f"{args.provider} default",
+        # Resolve the default rather than recording "<provider> default". The
+        # banner names the model that produced the run, and "anthropic default"
+        # tells a reader nothing and stops meaning the same thing the moment
+        # the catalogue moves.
+        "model_name": args.model or PROVIDER_DEFAULTS.get(args.provider, args.provider),
         "duration_seconds": duration,
         "frames": frames,
         "logs": logs,
