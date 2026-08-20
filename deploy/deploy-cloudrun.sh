@@ -15,6 +15,27 @@ FRONTEND_ORIGIN="${FRONTEND_ORIGIN:?set FRONTEND_ORIGIN (your Vercel URL, e.g. h
 
 echo "Deploying $SERVICE to $REGION in $PROJECT_ID ..."
 
+# Mount only the secrets that exist. deploy/README.md marks OPENAI_API_KEY (and
+# GROQ_API_KEY) optional, but --set-secrets fails the whole deploy when it names
+# a secret that was never created — so following the runbook exactly used to
+# break here. Callers supply their own key per request anyway; these are
+# server-side fallbacks.
+SECRETS=""
+for NAME in ANTHROPIC_API_KEY OPENAI_API_KEY GROQ_API_KEY E2B_API_KEY; do
+  if gcloud secrets describe "$NAME" --project "$PROJECT_ID" >/dev/null 2>&1; then
+    SECRETS="${SECRETS:+$SECRETS,}${NAME}=${NAME}:latest"
+  else
+    echo "  note: secret $NAME not found — skipping"
+  fi
+done
+
+if [ -z "$SECRETS" ]; then
+  echo "error: no provider secrets found in $PROJECT_ID." >&2
+  echo "       Create at least E2B_API_KEY — production refuses to boot without it." >&2
+  echo "       See deploy/README.md step 2." >&2
+  exit 1
+fi
+
 # Builds the Dockerfile via Cloud Build, then deploys. Secrets are mounted as env
 # vars from Secret Manager; non-secret config is passed with --set-env-vars.
 gcloud run deploy "$SERVICE" \
@@ -28,7 +49,7 @@ gcloud run deploy "$SERVICE" \
   --concurrency 4 \
   --max-instances 3 \
   --set-env-vars "APP_ENV=production,EXECUTION_BACKEND=e2b,ALLOWED_ORIGINS=${FRONTEND_ORIGIN},MLFLOW_TRACKING_URI=file:./mlruns" \
-  --set-secrets "ANTHROPIC_API_KEY=ANTHROPIC_API_KEY:latest,OPENAI_API_KEY=OPENAI_API_KEY:latest,E2B_API_KEY=E2B_API_KEY:latest"
+  --set-secrets "$SECRETS"
 
 echo
 echo "Deployed. Service URL:"

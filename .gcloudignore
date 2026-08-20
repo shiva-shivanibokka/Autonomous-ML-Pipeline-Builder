@@ -1,0 +1,48 @@
+# What `gcloud run deploy --source .` uploads to Cloud Build.
+#
+# This has to exist separately from .dockerignore. gcloud does not read
+# .dockerignore, and when there is no .gcloudignore it synthesises one from the
+# TOP-LEVEL .gitignore only — which says nothing about node_modules, because the
+# rule that ignores it lives in web/.gitignore. The result was ~370 MB and 10k
+# files of frontend dependencies uploaded on every backend deploy, for an image
+# whose Dockerfile does not copy web/ at all.
+
+# Frontend — deploys separately to Vercel
+web/
+
+# Tests, docs, CI (knowledge/*.md stays: the RAG corpus is needed at runtime)
+tests/
+docs/
+.github/
+README.md
+
+# Python caches / envs
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Local data & artifacts — created at runtime, never baked into the image
+outputs/
+uploads/
+data/
+mlruns/
+mlartifacts/
+runs.db
+*.csv
+*.pkl
+*.joblib
+
+# Local compose
+docker-compose.yml
+
+# Secrets & git
+.env
+.env.*
+.git/
+.gitignore
+.idea/
+.vscode/

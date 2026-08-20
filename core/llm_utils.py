@@ -56,17 +56,22 @@ def extract_json(text: str) -> str:
 
     Useful when the LLM adds prose before/after the JSON blob.
     Falls back to the original text if no JSON is found.
+
+    Scans candidate start positions with json.raw_decode rather than matching
+    `\\{.*\\}` under DOTALL. That pattern is greedy: it spans from the first
+    brace to the last one, so a closing sentence like "Note: set {b} later."
+    swallowed the prose into the candidate and failed to parse. The orchestrator
+    raises when its plan will not parse, so one stray brace failed the whole run.
     """
-    # Try to find a JSON object {...} or array [...]
-    for pattern in (r"\{.*\}", r"\[.*\]"):
-        match = re.search(pattern, text, re.DOTALL)
-        if match:
-            candidate = match.group(0)
-            try:
-                json.loads(candidate)
-                return candidate
-            except json.JSONDecodeError:
-                continue
+    decoder = json.JSONDecoder()
+    for i, ch in enumerate(text):
+        if ch not in "{[":
+            continue
+        try:
+            _, end = decoder.raw_decode(text, i)
+        except ValueError:
+            continue  # not the start of a well-formed value — keep scanning
+        return text[i:end]
 
     return text
 
@@ -89,14 +94,16 @@ def parse_structured_output(
     Args:
         raw:    The raw string from llm.invoke(...).content
         schema: A Pydantic BaseModel subclass to validate against
-        strict: If True, re-raises ValidationError instead of returning None
+        strict: Kept for call-site compatibility; validation failures always
+                raise. Use safe_parse() when a bad response should not stop
+                the pipeline.
 
     Returns:
         A validated instance of `schema`.
 
     Raises:
-        ValueError: If JSON parsing fails.
-        ValidationError: If Pydantic validation fails and strict=True.
+        ValueError:      If JSON parsing fails.
+        ValidationError: If Pydantic validation fails.
     """
     cleaned = strip_fences(raw)
     cleaned = extract_json(cleaned)
@@ -113,13 +120,11 @@ def parse_structured_output(
     try:
         return schema(**data)
     except ValidationError as exc:
-        if strict:
-            raise
+        # This used to log "Attempting field-by-field construction." and then
+        # raise without attempting anything — a log line describing work that
+        # did not happen, in the one place someone reads to find out why.
         logger.warning(
-            "Pydantic validation failed for schema %s: %s. "
-            "Attempting field-by-field construction.",
-            schema.__name__,
-            exc,
+            "Pydantic validation failed for schema %s: %s", schema.__name__, exc
         )
         raise
 

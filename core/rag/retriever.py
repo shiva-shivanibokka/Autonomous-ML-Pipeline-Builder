@@ -129,7 +129,12 @@ def retrieve_context(query: str, k: int = 3, max_chars: int = 1800) -> str:
     for h in hits:
         block = f"### {h['title']} (source: {h['source']})\n{h['text']}"
         if used + len(block) > max_chars:
-            break
+            # Skip this one and keep looking rather than stopping. `break` meant
+            # that a single doc grown past the budget returned no grounding at
+            # all for every query that ranked it first — worse than grounding on
+            # the runner-up. Docs are all well under 1800 today; this keeps that
+            # from becoming a silent cliff when one of them grows.
+            continue
         blocks.append(block)
         used += len(block)
     return "\n\n".join(blocks)

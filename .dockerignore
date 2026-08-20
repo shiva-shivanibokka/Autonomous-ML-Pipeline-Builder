@@ -5,8 +5,7 @@ web/
 tests/
 docs/
 .github/
-/README.md
-/AUDIT.md
+README.md
 
 # Python caches / envs
 __pycache__/
@@ -28,10 +27,8 @@ runs.db
 *.pkl
 *.joblib
 
-# Local compose / dev-only Dockerfiles
+# Local compose
 docker-compose.yml
-Dockerfile.gradio
-Dockerfile.api
 
 # Secrets & git
 .env

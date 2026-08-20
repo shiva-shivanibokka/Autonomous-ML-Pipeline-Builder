@@ -177,7 +177,9 @@ tests/         # pytest suite
 
 ## Deployment
 
-Not yet deployed. The path is fully configured: backend → Cloud Run (non-root `Dockerfile`), frontend → Vercel (`web/`). Step-by-step runbook — secrets, env, CORS wiring, rollback — in **[deploy/README.md](deploy/README.md)**. Remaining tasks are tracked in [TODO.md](TODO.md).
+Not yet deployed — there is no live URL for this project. The path is fully configured: backend → Cloud Run (non-root `Dockerfile`, built in CI), frontend → Vercel (`web/`). Step-by-step runbook — secrets, env, CORS wiring, rollback — in **[deploy/README.md](deploy/README.md)**.
+
+Standing it up needs accounts rather than code: a GCP project, an [E2B](https://e2b.dev) key (production refuses to boot without one), the secrets from the runbook, then `PROJECT_ID=… FRONTEND_ORIGIN=… ./deploy/deploy-cloudrun.sh`. The frontend is a Vercel import with **Root Directory = `web`** and `NEXT_PUBLIC_API_BASE_URL` pointed at the Cloud Run URL; put that Vercel URL in the backend's `ALLOWED_ORIGINS` to close the loop.
 
 ## Roadmap / known limitations
 
@@ -187,8 +189,10 @@ Not yet deployed. The path is fully configured: backend → Cloud Run (non-root 
 - **The E2B sandbox path has no live test.** CI runs the subprocess backend, so it
   verifies the security gate, the pinned SDK's call surface, and how a failed
   execution is rendered — but nothing in CI actually talks to a sandbox. Running one
-  pipeline with a real E2B key is on the [TODO](TODO.md).
-- Full task list in [TODO.md](TODO.md).
+  pipeline with a real E2B key is the remaining gap.
+- **No live end-to-end run is recorded.** Every layer below the API is unit-tested and
+  CI builds the image, but the LLM-dependent agents have not been exercised together
+  against a real key in a way this repo can prove.
 
 ## License
 

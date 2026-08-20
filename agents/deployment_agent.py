@@ -62,6 +62,10 @@ COPY fastapi_endpoint.py .
 COPY pipeline.py .
 COPY model.pkl .
 
+# Run as a non-root user
+RUN useradd --create-home --uid 1000 appuser && chown -R appuser:appuser /app
+USER appuser
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \\
     CMD curl -f http://localhost:8000/health || exit 1
@@ -72,13 +76,57 @@ CMD ["python", "fastapi_endpoint.py"]
 """
 
 
+def _json_type(dtype: str) -> str:
+    """Map a pandas dtype string onto a JSON Schema type."""
+    d = dtype.lower()
+    if d.startswith("bool"):
+        return "boolean"
+    if d.startswith(("int", "uint")):
+        return "integer"
+    if d.startswith("float"):
+        return "number"
+    return "string"  # object, category, datetime — all arrive as strings
+
+
+def _python_type(dtype: str) -> str:
+    return {"boolean": "bool", "integer": "int", "number": "float", "string": "str"}[
+        _json_type(dtype)
+    ]
+
+
+def _feature_fields(state: AgentState) -> list[dict[str, str]]:
+    """
+    The raw input columns the served pipeline expects, with their real dtypes.
+
+    model_trainer captures this from X before any preprocessing, precisely so
+    the serving layer knows what raw input looks like. The deployment agent used
+    to ignore it and rebuild the list from the profile's column names instead,
+    typing every field — categorical ones included — as float.
+    """
+    schema = state.get("feature_schema") or []
+    if schema:
+        return [
+            {"name": str(f["name"]), "dtype": str(f.get("dtype", "object"))}
+            for f in schema
+        ]
+
+    # Fallback for older runs with no feature_schema in state.
+    profile = state.get("dataset_profile", {}) or {}
+    return [{"name": c, "dtype": "float64"} for c in profile.get("numeric_cols", [])] + [
+        {"name": c, "dtype": "object"} for c in profile.get("categorical_cols", [])
+    ]
+
+
 def _generate_openapi_spec(
-    model_name: str, task_type: str, feature_names: list[str], target_col: str
+    model_name: str, task_type: str, features: list[dict[str, str]], target_col: str
 ) -> dict:
     """Generate a minimal OpenAPI 3.0 spec for the inference endpoint."""
     properties = {
-        feat: {"type": "number", "description": f"Feature: {feat}"}
-        for feat in feature_names[:20]  # Limit for readability
+        f["name"]: {
+            "type": _json_type(f["dtype"]),
+            "description": f"Feature: {f['name']} ({f['dtype']})",
+        }
+        for f in features
     }
 
     response_props = {
@@ -176,17 +224,18 @@ def run_deployment_agent(state: AgentState) -> dict:
         winner = eval_result.get("winner_model", "model")
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "target")
-        feature_names = profile.get("numeric_cols", []) + profile.get(
-            "categorical_cols", []
-        )
+        features = _feature_fields(state)
 
         llm = get_codegen_llm(
             provider=state["provider"],
             api_key=state["api_key"],
         )
 
-        # Build typed feature list for the prompt
-        feature_type_list = ", ".join(f"{f}: float" for f in feature_names[:15])
+        # Every field, with its real type. Truncating to the first 15 produced a
+        # request model missing the rest of the columns the pipeline needs.
+        feature_type_list = ", ".join(
+            f"{f['name']}: {_python_type(f['dtype'])}" for f in features
+        )
 
         user_prompt = (
             f"Generate a FastAPI inference endpoint for this model:\n\n"
@@ -207,7 +256,7 @@ def run_deployment_agent(state: AgentState) -> dict:
 
         # Generate OpenAPI spec
         openapi_spec = _generate_openapi_spec(
-            winner, task_type, feature_names, target_col
+            winner, task_type, features, target_col
         )
 
         # Write all artifacts to the per-run output directory

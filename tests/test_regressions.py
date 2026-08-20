@@ -9,6 +9,7 @@ checking the two things that were actually wrong — the package's call surface,
 and how a failed execution is turned into text.
 """
 
+import json
 import sys
 
 import pytest
@@ -162,3 +163,124 @@ def test_update_preserves_created_at_so_the_ttl_still_expires_it(tmp_path):
     # A later create triggers the sweep; the old run is past its TTL by then.
     store.create("b" * 32, 2000.0)
     assert store.get("a" * 32) is None, "updating a run reset its age"
+
+
+# ── Shared LLM output parsing ─────────────────────────────────────────────────
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        '{"a": 1}',
+        'Here is the JSON: {"a": 1}',
+        # Greedy `\{.*\}` under DOTALL spanned from the first brace to the last,
+        # so a closing sentence with a brace in it broke the parse. The
+        # orchestrator raises when its plan will not parse — one stray brace
+        # failed the entire run at step 1.
+        '{"a": 1}\nNote: set {b} later.',
+        '{"a": 1}\n{"b": 2}',
+        '```json\n{"a": 1}\n```',
+    ],
+)
+def test_json_survives_prose_on_either_side(raw):
+    from core.llm_utils import extract_json, strip_fences
+
+    assert json.loads(extract_json(strip_fences(raw))) == {"a": 1}
+
+
+def test_nested_json_is_extracted_whole():
+    from core.llm_utils import extract_json
+
+    got = json.loads(extract_json('text {"a": {"b": [1, 2]}} tail {x}'))
+    assert got == {"a": {"b": [1, 2]}}
+
+
+def test_text_with_no_json_is_returned_for_a_clear_error():
+    from core.llm_utils import extract_json
+
+    assert extract_json("sorry, I cannot help") == "sorry, I cannot help"
+
+
+# ── Generated deployment artifacts ────────────────────────────────────────────
+
+
+def test_generated_api_types_categoricals_as_strings_not_floats():
+    """
+    The deployment agent typed every feature as float, categoricals included,
+    in both the LLM prompt and the OpenAPI spec — while model_trainer had
+    already recorded the real dtypes in feature_schema. The served pipeline
+    expects raw strings for those columns, so the generated request model
+    contradicted the model it was serving.
+    """
+    from agents.deployment_agent import _feature_fields, _generate_openapi_spec
+
+    state = {
+        "feature_schema": [
+            {"name": "age", "dtype": "int64"},
+            {"name": "income", "dtype": "float64"},
+            {"name": "city", "dtype": "object"},
+            {"name": "is_member", "dtype": "bool"},
+        ]
+    }
+    spec = _generate_openapi_spec(
+        "lightgbm", "classification", _feature_fields(state), "churn"
+    )
+    props = spec["paths"]["/predict"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]["properties"]
+
+    assert props["age"]["type"] == "integer"
+    assert props["income"]["type"] == "number"
+    assert props["city"]["type"] == "string"
+    assert props["is_member"]["type"] == "boolean"
+
+
+def test_every_feature_reaches_the_spec():
+    """`feature_names[:20]` silently produced a spec missing later columns."""
+    from agents.deployment_agent import _feature_fields, _generate_openapi_spec
+
+    state = {
+        "feature_schema": [
+            {"name": f"f{i}", "dtype": "float64"} for i in range(30)
+        ]
+    }
+    spec = _generate_openapi_spec("xgboost", "regression", _feature_fields(state), "y")
+    props = spec["paths"]["/predict"]["post"]["requestBody"]["content"][
+        "application/json"
+    ]["schema"]["properties"]
+
+    assert len(props) == 30
+
+
+def test_generated_dockerfile_runs_as_non_root():
+    """The repo's own image is non-root; the one it hands users should be too."""
+    from agents.deployment_agent import DOCKERFILE_TEMPLATE
+
+    assert "USER appuser" in DOCKERFILE_TEMPLATE
+
+
+# ── RAG context budget ────────────────────────────────────────────────────────
+
+
+def test_one_oversized_doc_does_not_wipe_out_the_context():
+    """
+    The budget loop used `break`, so a single doc grown past max_chars returned
+    no grounding at all for any query that ranked it first.
+    """
+    from core.rag import retriever
+
+    class _KB:
+        def retrieve(self, query, k=3):
+            return [
+                {"title": "big", "source": "big.md", "text": "x" * 5000},
+                {"title": "small", "source": "small.md", "text": "useful guidance"},
+            ]
+
+    original = retriever.get_knowledge_base
+    retriever.get_knowledge_base = lambda: _KB()
+    try:
+        ctx = retriever.retrieve_context("anything", max_chars=1800)
+    finally:
+        retriever.get_knowledge_base = original
+
+    assert "useful guidance" in ctx
