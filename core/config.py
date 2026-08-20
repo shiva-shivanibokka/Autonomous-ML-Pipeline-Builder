@@ -9,13 +9,48 @@ Usage:
     api_key = settings.anthropic_api_key
 """
 
+import logging
+import os
 from functools import lru_cache
 
-from dotenv import load_dotenv
+from dotenv import dotenv_values, load_dotenv
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings
 
-load_dotenv()
+logger = logging.getLogger(__name__)
+
+
+def _load_env() -> None:
+    """
+    Load .env, and say so when it disagrees with the real environment.
+
+    `load_dotenv()` will not overwrite a variable that is already set, which
+    makes a stale shell or Windows user-level variable silently beat the file
+    the README tells you to edit. That failure is invisible and expensive: it
+    looks exactly like a bad key, because the value being sent really is a
+    different key from the one you just pasted in.
+
+    So: the file wins, and any variable it had to override is named in a
+    warning. Deployed there is no .env at all (see .dockerignore /
+    .gcloudignore), so real environment variables still rule in production.
+    """
+    from_file = dotenv_values()
+    shadowed = [
+        k
+        for k, v in from_file.items()
+        if v and k in os.environ and os.environ[k] != v
+    ]
+    load_dotenv(override=True)
+    if shadowed:
+        logger.warning(
+            "Using .env for %s - the environment already had a different value "
+            "for %s. If you meant the environment to win, remove it from .env.",
+            ", ".join(shadowed),
+            "them" if len(shadowed) > 1 else "it",
+        )
+
+
+_load_env()
 
 
 class Settings(BaseSettings):
