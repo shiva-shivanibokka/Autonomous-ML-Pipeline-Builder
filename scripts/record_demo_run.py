@@ -202,9 +202,30 @@ def main() -> int:
         "artifacts": copied,
     }
 
+    payload = json.dumps(run, indent=2, default=str)
+
+    # This file gets committed to a public repo and served as a static asset.
+    # Nothing here is supposed to carry the key, but "supposed to" is not a
+    # guarantee worth publishing on: check the actual bytes before writing.
+    if api_key and api_key in payload:
+        print(
+            "\nREFUSING TO WRITE: the API key appears in the recording.\n"
+            "Something logged it. Fix that before recording again - this file\n"
+            "is committed to a public repository."
+        )
+        return 1
+    for artifact in ARTIFACT_DIR.glob("*"):
+        if artifact.suffix in {".py", ".json", ".txt", ""} and api_key:
+            try:
+                if api_key in artifact.read_text(encoding="utf-8", errors="ignore"):
+                    print(f"\nREFUSING TO WRITE: the API key appears in {artifact.name}.")
+                    return 1
+            except OSError:
+                pass
+
     DEMO_DIR.mkdir(parents=True, exist_ok=True)
     out = DEMO_DIR / "run.json"
-    out.write_text(json.dumps(run, indent=2, default=str), encoding="utf-8")
+    out.write_text(payload, encoding="utf-8")
 
     print(f"\nRecorded {len(frames)} frames and {len(logs)} log lines in {duration:.0f}s.")
     print(f"Wrote {out.relative_to(ROOT)}")
