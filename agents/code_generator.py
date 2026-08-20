@@ -18,7 +18,7 @@ from datetime import datetime
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from agents.state import AgentState, DeploymentArtifacts
-from core.llm_utils import build_system_prompt, extract_content, strip_fences
+from core.llm_utils import build_system_prompt, extract_code, extract_content
 from core.providers import get_codegen_llm
 from core.rag import retrieve_context
 
@@ -43,6 +43,7 @@ PIPELINE_CODE_PROMPT = build_system_prompt(
         "Use only: pandas, numpy, scikit-learn, lightgbm, xgboost (standard ML stack).\n"
         "Output ONLY the Python code. No explanation, no markdown fences."
     ),
+    json_output=False,
 )
 
 REQUIREMENTS_TEMPLATE = """pandas>=2.0.0
@@ -124,7 +125,7 @@ def run_code_generator(state: AgentState) -> dict:
                 HumanMessage(content=user_prompt),
             ]
         )
-        pipeline_code = strip_fences(extract_content(response))
+        pipeline_code = extract_code(extract_content(response))
 
         logs.append(
             f"[{timestamp}] CODE GENERATOR — Generated {len(pipeline_code)} chars. Validating in sandbox..."

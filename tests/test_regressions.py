@@ -284,3 +284,54 @@ def test_one_oversized_doc_does_not_wipe_out_the_context():
         retriever.get_knowledge_base = original
 
     assert "useful guidance" in ctx
+
+
+# ── Generated code artifacts must be code, not JSON ───────────────────────────
+
+
+CODE_SAMPLE = "import os\nprint(1)\n"
+
+
+@pytest.mark.parametrize(
+    "wrapper",
+    [
+        lambda c: c,
+        lambda c: json.dumps({"code": c}),
+        lambda c: json.dumps({"pipeline.py": c}),
+        lambda c: "```python\n" + c + "```",
+        lambda c: "```json\n" + json.dumps({"code": c}) + "\n```",
+    ],
+)
+def test_source_is_recovered_from_a_json_wrapped_reply(wrapper):
+    """
+    build_system_prompt appended "Respond ONLY with valid JSON" to every agent
+    prompt, including the two that ask for raw Python. The model obeyed the
+    JSON rule, so the pipeline.py and fastapi_endpoint.py in the downloadable
+    "runnable bundle" were JSON documents with a .py name.
+    """
+    from core.llm_utils import extract_code
+
+    assert extract_code(wrapper(CODE_SAMPLE)).strip() == CODE_SAMPLE.strip()
+
+
+def test_unwrapping_never_mangles_code_that_merely_contains_a_dict():
+    """Being wrong in this direction would corrupt working source."""
+    from core.llm_utils import extract_code
+
+    src = 'CONFIG = {"a": 1}\nprint(CONFIG)\n'
+    assert extract_code(src).strip() == src.strip()
+
+
+def test_code_prompts_do_not_demand_json():
+    from agents.code_generator import PIPELINE_CODE_PROMPT
+    from agents.deployment_agent import FASTAPI_PROMPT
+
+    for prompt in (PIPELINE_CODE_PROMPT, FASTAPI_PROMPT):
+        assert "valid JSON" not in prompt
+        assert "raw file contents" in prompt
+
+
+def test_schema_prompts_still_demand_json():
+    from agents.data_analyst import SYSTEM_PROMPT
+
+    assert "valid JSON" in SYSTEM_PROMPT

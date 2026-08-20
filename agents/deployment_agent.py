@@ -20,7 +20,7 @@ from datetime import datetime
 from langchain_core.messages import HumanMessage, SystemMessage
 
 from agents.state import AgentState
-from core.llm_utils import build_system_prompt, extract_content, strip_fences
+from core.llm_utils import build_system_prompt, extract_code, extract_content
 from core.providers import get_codegen_llm
 
 logger = logging.getLogger(__name__)
@@ -42,6 +42,7 @@ FASTAPI_PROMPT = build_system_prompt(
         "  9. if __name__ == '__main__': uvicorn.run(...) at the bottom\n\n"
         "Output ONLY the Python code. No explanation, no fences."
     ),
+    json_output=False,
 )
 
 DOCKERFILE_TEMPLATE = """FROM python:3.11-slim
@@ -252,7 +253,7 @@ def run_deployment_agent(state: AgentState) -> dict:
                 HumanMessage(content=user_prompt),
             ]
         )
-        fastapi_code = strip_fences(extract_content(response))
+        fastapi_code = extract_code(extract_content(response))
 
         # Generate OpenAPI spec
         openapi_spec = _generate_openapi_spec(

@@ -172,18 +172,64 @@ def extract_content(response: Any) -> str:
     return str(response)
 
 
-def build_system_prompt(role: str, context: str = "") -> str:
+def extract_code(raw: str) -> str:
+    """
+    Get source text out of a reply that may still be JSON-wrapped.
+
+    Belt and braces for the prompt fix below: even when told to return raw
+    source, a model sometimes replies `{"code": "..."}` or
+    `{"pipeline.py": "..."}`. Unwrapping a single-string JSON object beats
+    writing it to a .py file, which is exactly what used to ship — the
+    "runnable bundle" contained two JSON documents named .py.
+
+    Deliberately conservative: it only unwraps when the whole reply is a JSON
+    object. Hunting for JSON inside a longer reply risks mistaking a dict
+    literal in real Python for a wrapper and mangling working code, which is a
+    worse outcome than leaving one odd reply alone.
+    """
+    text = strip_fences(raw).strip()
+    if not text.startswith("{"):
+        return text
+    try:
+        obj = json.loads(text)
+    except ValueError:
+        return text
+    if isinstance(obj, dict):
+        strings = [v for v in obj.values() if isinstance(v, str)]
+        if strings:
+            return max(strings, key=len).strip()
+    return text
+
+
+def build_system_prompt(
+    role: str, context: str = "", *, json_output: bool = True
+) -> str:
     """
     Construct a clean system prompt for an agent node.
 
-    Enforces JSON-only output to reduce parse failures.
+    `json_output=True` (the default) enforces JSON-only replies, which is what
+    the agents parsing into Pydantic models want.
+
+    The code-writing agents want the opposite and used to get this header
+    anyway: their own context said "Output ONLY the Python code" while the
+    header above it said "Respond ONLY with valid JSON". The model obeyed the
+    JSON instruction and wrapped the source, so the pipeline.py and
+    fastapi_endpoint.py a user downloaded were JSON documents rather than
+    runnable modules. Pass `json_output=False` for raw file contents.
     """
-    base = (
-        f"You are {role}.\n\n"
-        "IMPORTANT: Respond ONLY with valid JSON. "
-        "Do not include any prose, markdown fences, or explanation outside the JSON. "
-        "Your entire response must be parseable by json.loads()."
-    )
+    if json_output:
+        rule = (
+            "IMPORTANT: Respond ONLY with valid JSON. "
+            "Do not include any prose, markdown fences, or explanation outside the JSON. "
+            "Your entire response must be parseable by json.loads()."
+        )
+    else:
+        rule = (
+            "IMPORTANT: Respond with the raw file contents and nothing else. "
+            "No JSON wrapper, no markdown fences, no commentary before or after. "
+            "The first character of your reply must be the first character of the file."
+        )
+    base = f"You are {role}.\n\n{rule}"
     if context:
         base += f"\n\nContext:\n{context}"
     return base
