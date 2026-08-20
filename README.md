@@ -6,6 +6,7 @@
 ![Backend](https://img.shields.io/badge/backend-FastAPI%20%C2%B7%20LangGraph-0b7285)
 ![Frontend](https://img.shields.io/badge/frontend-Next.js%20%C2%B7%20Vercel-black)
 ![License](https://img.shields.io/badge/license-MIT-blue)
+[![Live console](https://img.shields.io/badge/live-console%20replay-35d0ba)](https://autonomous-ml-pipeline-builder.vercel.app)
 
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
@@ -14,7 +15,9 @@
 
 A LangGraph crew of seven agents plans the approach, profiles the data, engineers leakage-safe features, trains and cross-validates several models in parallel, explains the winner with SHAP, and emits a runnable FastAPI + Docker inference bundle. A Next.js console streams every agent's work in real time.
 
-> **The console is published as a replay of one real run** — the backend needs an LLM key per run and a paid sandbox, so it is not hosted. Everything you see there came out of an actual pipeline run; see [The hosted console is a replay](#the-hosted-console-is-a-replay). To run it for real, [`docker compose up`](#run-it-locally) gives you the whole stack.
+### ▶ [autonomous-ml-pipeline-builder.vercel.app](https://autonomous-ml-pipeline-builder.vercel.app)
+
+**The live console replays one real run.** The backend needs an LLM key per run and a paid sandbox, so it is not hosted — but every log line, metric, SHAP plot and downloadable file on that page came out of an actual pipeline run, and the page says so rather than pretending to be live. See [The hosted console is a replay](#the-hosted-console-is-a-replay). To run it for real, [`docker compose up`](#run-it-locally) gives you the whole stack.
 
 ### What one real run produced
 
