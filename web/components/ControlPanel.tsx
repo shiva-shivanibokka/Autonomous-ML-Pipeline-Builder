@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import InfoTip from "@/components/InfoTip";
 import { uploadCsv } from "@/lib/api";
 import type { Provider, UploadResponse } from "@/lib/types";
 
@@ -9,6 +10,13 @@ const MODELS: Record<Provider, string[]> = {
   openai: ["gpt-4o", "gpt-4o-mini"],
   groq: ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"],
 };
+
+/** Render a cell without letting one long value stretch the whole table. */
+function formatCell(v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const str = String(v);
+  return str.length > 24 ? `${str.slice(0, 23)}…` : str;
+}
 
 export interface RunParams {
   upload_id: string;
@@ -64,7 +72,10 @@ export default function ControlPanel({
   return (
     <div className="panel" style={{ padding: 22 }}>
       {/* 1. Dataset */}
-      <label className="field-label">1 · Dataset</label>
+      <label className="field-label">
+        1 · Dataset
+        <InfoTip text="A CSV where one column is what you want to predict and the rest are features. The header row is required. Up to 50 MB; the file is stored under a server-issued id, never a path you supply." />
+      </label>
       <div
         onClick={() => fileRef.current?.click()}
         onDragOver={(e) => e.preventDefault()}
@@ -93,33 +104,56 @@ export default function ControlPanel({
           <span style={{ color: "var(--running)", fontSize: 13 }}>Uploading…</span>
         ) : upload ? (
           <div>
-            <div style={{ color: "var(--done)", fontSize: 14 }}>{upload.filename}</div>
-            <div className="mono" style={{ color: "var(--faint)", fontSize: 12, marginTop: 3 }}>
+            <div style={{ color: "var(--done)", fontSize: 15 }}>{upload.filename}</div>
+            <div className="mono" style={{ color: "var(--faint)", fontSize: 13, marginTop: 4 }}>
               {upload.n_rows.toLocaleString()} rows × {upload.n_cols} cols
             </div>
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 14 }}>Drop a CSV or click to browse</div>
-            <div style={{ color: "var(--faint)", fontSize: 12, marginTop: 3 }}>
+            <div style={{ fontSize: 15 }}>Drop a CSV or click to browse</div>
+            <div style={{ color: "var(--faint)", fontSize: 13, marginTop: 4 }}>
               Up to 50 MB
             </div>
           </div>
         )}
       </div>
       {upload && (
-        <div
-          className="mono"
-          style={{ color: "var(--muted)", fontSize: 11.5, marginTop: 8, wordBreak: "break-word" }}
-        >
-          columns: {upload.columns.slice(0, 8).join(", ")}
-          {upload.columns.length > 8 ? " …" : ""}
-        </div>
+        <>
+          <div
+            className="field-label"
+            style={{ display: "block", marginTop: 14 }}
+          >
+            First {upload.preview.length} rows
+            <InfoTip text="Parsed by pandas on the server, exactly as the agents will see it. If a column looks wrong here — everything in one column, or a header row read as data — fix the CSV before spending a run on it." />
+          </div>
+          <div className="preview-wrap">
+            <table className="preview">
+              <thead>
+                <tr>
+                  {upload.columns.map((c) => (
+                    <th key={c}>{c}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {upload.preview.map((row, i) => (
+                  <tr key={i}>
+                    {upload.columns.map((c) => (
+                      <td key={c}>{formatCell(row[c])}</td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
       )}
 
       {/* 2. Problem */}
-      <label className="field-label" style={{ display: "block", marginTop: 20 }}>
+      <label className="field-label" style={{ display: "block", marginTop: 22 }}>
         2 · What should the model predict?
+        <InfoTip text="Plain English. Name the target column if you can. The Orchestrator reads this to decide classification vs regression, which models to try, and which metric to optimise — so 'minimise false negatives' genuinely changes the outcome." />
       </label>
       <textarea
         value={problem}
@@ -130,8 +164,9 @@ export default function ControlPanel({
       />
 
       {/* 3. Model provider */}
-      <label className="field-label" style={{ display: "block", marginTop: 20 }}>
+      <label className="field-label" style={{ display: "block", marginTop: 22 }}>
         3 · LLM provider
+        <InfoTip text="Six of the seven agents call this model — it plans the run, profiles the data, writes the preprocessing code, and writes the pipeline and serving code. Only the Model Trainer is pure scikit-learn. Your key goes straight to the provider and is never stored." />
       </label>
       <div className="mt-2 grid grid-cols-2 gap-2">
         <select
@@ -172,10 +207,10 @@ export default function ControlPanel({
       </button>
 
       {error && (
-        <div style={{ color: "var(--error)", fontSize: 13, marginTop: 12 }}>{error}</div>
+        <div style={{ color: "var(--error)", fontSize: 14, marginTop: 12 }}>{error}</div>
       )}
       {!upload && !error && (
-        <div style={{ color: "var(--faint)", fontSize: 12, marginTop: 12 }}>
+        <div style={{ color: "var(--faint)", fontSize: 13, marginTop: 12 }}>
           Bring your own API key — the agents call your chosen provider directly.
         </div>
       )}
