@@ -1,0 +1,232 @@
+{
+  "recorded_at": "2026-08-20T21:11:01Z",
+  "dataset": {
+    "name": "telco_churn.csv",
+    "n_rows": 7043,
+    "n_cols": 21
+  },
+  "business_problem": "Predict which customers will churn. The target column is Churn. customerID is an identifier, not a feature. Recall on churners matters more than overall accuracy - a missed churner costs more than a false alarm.",
+  "provider": "anthropic",
+  "model_name": "anthropic default",
+  "duration_seconds": 122.28,
+  "frames": [
+    {
+      "t": 0.05,
+      "current_step": "orchestrator",
+      "status": "running",
+      "n_logs": 0
+    },
+    {
+      "t": 5.4,
+      "current_step": "data_analyst",
+      "status": "running",
+      "n_logs": 6
+    },
+    {
+      "t": 17.05,
+      "current_step": "feature_engineer",
+      "status": "running",
+      "n_logs": 15
+    },
+    {
+      "t": 23.13,
+      "current_step": "model_trainer",
+      "status": "running",
+      "n_logs": 20
+    },
+    {
+      "t": 61.25,
+      "current_step": "evaluator",
+      "status": "running",
+      "n_logs": 26
+    },
+    {
+      "t": 85.26,
+      "current_step": "code_generator",
+      "status": "running",
+      "n_logs": 33
+    },
+    {
+      "t": 113.9,
+      "current_step": "deployment_agent",
+      "status": "running",
+      "n_logs": 37
+    },
+    {
+      "t": 122.28,
+      "current_step": "done",
+      "status": "completed",
+      "n_logs": 44
+    },
+    {
+      "t": 122.28,
+      "current_step": "deployment_agent",
+      "status": "completed",
+      "n_logs": 44
+    }
+  ],
+  "logs": [
+    "[14:08:59] ORCHESTRATOR \u2014 Planning pipeline...",
+    "[14:08:59] ORCHESTRATOR \u2014 Task type: classification",
+    "[14:08:59] ORCHESTRATOR \u2014 Models to train: lightgbm, xgboost, random_forest, logistic_regression",
+    "[14:08:59] ORCHESTRATOR \u2014 Primary metric: f1",
+    "[14:08:59] ORCHESTRATOR \u2014 Reasoning: The target 'Churn' indicates a binary classification task (churn vs. no churn). 'customerID' is excluded as it is an identifier with no predictive value. Since recall on churners is prioritized over overall accuracy\u2014meaning false negatives are costlier than false positives\u2014f1 is chosen as the primary metric because it balances precision and recall, and threshold tuning can be applied post-training to further favor recall. AUC is a secondary consideration but f1 better reflects the business cost asymmetry when combined with class-weighting or threshold adjustment. Lightgbm and xgboost are included as strong, fast gradient-boosting baselines that handle mixed categorical/numeric data well and support class-weight or scale_pos_weight tuning to boost recall on the minority churn class. Random_forest is added as a robust bagging-based alternative that also supports class weighting and is less prone to overfitting on smaller datasets. Logistic_regression is included as an interpretable linear baseline, useful for stakeholders who need to understand churn drivers, and it easily supports class-weight balancing to emphasize recall. MLP is omitted given unknown dataset size/schema, as it typically requires larger, well-preprocessed datasets to outperform tree-based models.",
+    "[14:08:59] ORCHESTRATOR \u2014 Done.",
+    "[14:09:04] DATA ANALYST \u2014 Profiling dataset...",
+    "[14:09:04] DATA ANALYST \u2014 Shape: 7043 rows \u00d7 21 cols",
+    "[14:09:04] DATA ANALYST \u2014 Missing values in 0 columns",
+    "[14:09:04] DATA ANALYST \u2014 Rec: Drop 'customerID' column entirely \u2014 it is a unique identifier with no predictive value and will cause data leakage/overfitting if encoded.",
+    "[14:09:04] DATA ANALYST \u2014 Rec: Convert 'TotalCharges' from object/categorical to numeric (it likely contains blank strings for new customers with tenure=0); coerce errors to NaN, then impute missing values using median or by computing tenure * MonthlyCharges.",
+    "[14:09:04] DATA ANALYST \u2014 Rec: Apply binary/label encoding to two-level categorical columns: 'gender', 'Partner', 'Dependents', 'PhoneService', 'Churn' (target).",
+    "[14:09:04] DATA ANALYST \u2014 Rec: Apply one-hot encoding to multi-level nominal categoricals: 'MultipleLines', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies', 'Contract', 'PaymentMethod', 'PaperlessBilling' \u2014 use drop_first=True to avoid multicollinearity.",
+    "[14:09:04] DATA ANALYST \u2014 Rec: Scale numeric columns ['tenure', 'MonthlyCharges', 'TotalCharges'] using StandardScaler or MinMaxScaler, especially important if using distance-based or gradient-based models (KNN, SVM, logistic regression, neural nets).",
+    "[14:09:04] DATA ANALYST \u2014 Done.",
+    "[14:09:16] FEATURE ENGINEER \u2014 Retrieving ML best-practices (RAG)...",
+    "[14:09:16] FEATURE ENGINEER \u2014 Generating preprocessing code...",
+    "[14:09:16] FEATURE ENGINEER \u2014 Code generated (2793 chars). Executing in sandbox...",
+    "[14:09:16] FEATURE ENGINEER \u2014 Execution succeeded in 1 attempt(s).",
+    "[14:09:16] FEATURE ENGINEER \u2014 Done.",
+    "[14:09:22] MODEL TRAINER \u2014 Training 3 models in parallel: ['lightgbm', 'xgboost', 'random_forest']",
+    "[14:09:22] MODEL TRAINER \u2014 Train: 5634, Test: 1409 rows | scale_pos_weight=2.768",
+    "[14:09:22] MODEL TRAINER \u2014 LIGHTGBM: accuracy=0.7452, f1=0.7578, precision=0.7943, recall=0.7452, auc=0.8322 | CV f1_weighted=0.7658\u00b10.0052 (37.37s)",
+    "[14:09:22] MODEL TRAINER \u2014 XGBOOST: accuracy=0.7637, f1=0.7727, precision=0.7925, recall=0.7637, auc=0.8328 | CV f1_weighted=0.7733\u00b10.0097 (28.52s)",
+    "[14:09:22] MODEL TRAINER \u2014 RANDOM_FOREST: accuracy=0.7551, f1=0.7668, precision=0.7997, recall=0.7551, auc=0.836 | CV f1_weighted=0.7765\u00b10.01 (23.85s)",
+    "[14:09:22] MODEL TRAINER \u2014 Done.",
+    "[14:10:00] EVALUATOR \u2014 Comparing 3 models...",
+    "[14:10:00] EVALUATOR \u2014 Winner: random_forest (auc=0.836)",
+    "[14:10:00] EVALUATOR \u2014 Justification: Random_forest was selected as the winner because it achieved the highest AUC (0.836) among all candidates, edging out xgboost (0.8328) and lightgbm (0.8322). It also delivered the best cross-validation mean (0.7765) and strong precision (0.7997), while training faster (23.85s) than both lightgbm and xgboost, making it an efficient and reliable choice despite a slightly higher cv_std and memory footprint (32.96MB) compared to the boosting models.",
+    "[14:10:00] EVALUATOR \u2014 Saved model.pkl + feature_schema.json",
+    "[14:10:00] EVALUATOR \u2014 Running SHAP on random_forest (test set)...",
+    "[14:10:00] EVALUATOR \u2014 BIAS WARNING: Sensitive features detected: ['gender']. Evaluate random_forest for disparate impact before deployment. Consider fairness metrics: demographic parity, equalized odds.",
+    "[14:10:00] EVALUATOR \u2014 Done.",
+    "[14:10:24] CODE GENERATOR \u2014 Writing production pipeline code...",
+    "[14:10:24] CODE GENERATOR \u2014 Generated 18123 chars. Validating in sandbox...",
+    "[14:10:24] CODE GENERATOR \u2014 Warning: syntax validation inconclusive.",
+    "[14:10:24] CODE GENERATOR \u2014 Done.",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 Generating API endpoint and Dockerfile...",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 FastAPI endpoint generated.",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 Dockerfile generated.",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 OpenAPI spec generated.",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 All artifacts saved to outputs/",
+    "[14:10:52] DEPLOYMENT AGENT \u2014 Done.",
+    "[14:10:52] PIPELINE COMPLETE \u2014 Winner: random_forest | Task: classification"
+  ],
+  "result": {
+    "pipeline_id": "demo",
+    "status": "completed",
+    "winner_model": "random_forest",
+    "primary_metric": "auc",
+    "metrics": {
+      "accuracy": 0.7551,
+      "f1": 0.7668,
+      "precision": 0.7997,
+      "recall": 0.7551,
+      "auc": 0.836
+    },
+    "justification": "Random_forest was selected as the winner because it achieved the highest AUC (0.836) among all candidates, edging out xgboost (0.8328) and lightgbm (0.8322). It also delivered the best cross-validation mean (0.7765) and strong precision (0.7997), while training faster (23.85s) than both lightgbm and xgboost, making it an efficient and reliable choice despite a slightly higher cv_std and memory footprint (32.96MB) compared to the boosting models.",
+    "bias_warnings": [
+      "Sensitive features detected: ['gender']. Evaluate random_forest for disparate impact before deployment. Consider fairness metrics: demographic parity, equalized odds."
+    ],
+    "comparison_table": [
+      {
+        "model": "lightgbm",
+        "accuracy": 0.7452,
+        "f1": 0.7578,
+        "precision": 0.7943,
+        "recall": 0.7452,
+        "auc": 0.8322,
+        "cv_mean": 0.7658,
+        "cv_std": 0.0052,
+        "train_time_s": 37.37,
+        "memory_mb": 0.0,
+        "failed": false
+      },
+      {
+        "model": "xgboost",
+        "accuracy": 0.7637,
+        "f1": 0.7727,
+        "precision": 0.7925,
+        "recall": 0.7637,
+        "auc": 0.8328,
+        "cv_mean": 0.7733,
+        "cv_std": 0.0097,
+        "train_time_s": 28.52,
+        "memory_mb": 0.0,
+        "failed": false
+      },
+      {
+        "model": "random_forest",
+        "accuracy": 0.7551,
+        "f1": 0.7668,
+        "precision": 0.7997,
+        "recall": 0.7551,
+        "auc": 0.836,
+        "cv_mean": 0.7765,
+        "cv_std": 0.01,
+        "train_time_s": 23.85,
+        "memory_mb": 32.96,
+        "failed": false
+      }
+    ],
+    "has_shap_plot": true,
+    "has_pipeline_code": true,
+    "has_fastapi_endpoint": true,
+    "has_dockerfile": true,
+    "logs": [
+      "[14:08:59] ORCHESTRATOR \u2014 Planning pipeline...",
+      "[14:08:59] ORCHESTRATOR \u2014 Task type: classification",
+      "[14:08:59] ORCHESTRATOR \u2014 Models to train: lightgbm, xgboost, random_forest, logistic_regression",
+      "[14:08:59] ORCHESTRATOR \u2014 Primary metric: f1",
+      "[14:08:59] ORCHESTRATOR \u2014 Reasoning: The target 'Churn' indicates a binary classification task (churn vs. no churn). 'customerID' is excluded as it is an identifier with no predictive value. Since recall on churners is prioritized over overall accuracy\u2014meaning false negatives are costlier than false positives\u2014f1 is chosen as the primary metric because it balances precision and recall, and threshold tuning can be applied post-training to further favor recall. AUC is a secondary consideration but f1 better reflects the business cost asymmetry when combined with class-weighting or threshold adjustment. Lightgbm and xgboost are included as strong, fast gradient-boosting baselines that handle mixed categorical/numeric data well and support class-weight or scale_pos_weight tuning to boost recall on the minority churn class. Random_forest is added as a robust bagging-based alternative that also supports class weighting and is less prone to overfitting on smaller datasets. Logistic_regression is included as an interpretable linear baseline, useful for stakeholders who need to understand churn drivers, and it easily supports class-weight balancing to emphasize recall. MLP is omitted given unknown dataset size/schema, as it typically requires larger, well-preprocessed datasets to outperform tree-based models.",
+      "[14:08:59] ORCHESTRATOR \u2014 Done.",
+      "[14:09:04] DATA ANALYST \u2014 Profiling dataset...",
+      "[14:09:04] DATA ANALYST \u2014 Shape: 7043 rows \u00d7 21 cols",
+      "[14:09:04] DATA ANALYST \u2014 Missing values in 0 columns",
+      "[14:09:04] DATA ANALYST \u2014 Rec: Drop 'customerID' column entirely \u2014 it is a unique identifier with no predictive value and will cause data leakage/overfitting if encoded.",
+      "[14:09:04] DATA ANALYST \u2014 Rec: Convert 'TotalCharges' from object/categorical to numeric (it likely contains blank strings for new customers with tenure=0); coerce errors to NaN, then impute missing values using median or by computing tenure * MonthlyCharges.",
+      "[14:09:04] DATA ANALYST \u2014 Rec: Apply binary/label encoding to two-level categorical columns: 'gender', 'Partner', 'Dependents', 'PhoneService', 'Churn' (target).",
+      "[14:09:04] DATA ANALYST \u2014 Rec: Apply one-hot encoding to multi-level nominal categoricals: 'MultipleLines', 'InternetService', 'OnlineSecurity', 'OnlineBackup', 'DeviceProtection', 'TechSupport', 'StreamingTV', 'StreamingMovies', 'Contract', 'PaymentMethod', 'PaperlessBilling' \u2014 use drop_first=True to avoid multicollinearity.",
+      "[14:09:04] DATA ANALYST \u2014 Rec: Scale numeric columns ['tenure', 'MonthlyCharges', 'TotalCharges'] using StandardScaler or MinMaxScaler, especially important if using distance-based or gradient-based models (KNN, SVM, logistic regression, neural nets).",
+      "[14:09:04] DATA ANALYST \u2014 Done.",
+      "[14:09:16] FEATURE ENGINEER \u2014 Retrieving ML best-practices (RAG)...",
+      "[14:09:16] FEATURE ENGINEER \u2014 Generating preprocessing code...",
+      "[14:09:16] FEATURE ENGINEER \u2014 Code generated (2793 chars). Executing in sandbox...",
+      "[14:09:16] FEATURE ENGINEER \u2014 Execution succeeded in 1 attempt(s).",
+      "[14:09:16] FEATURE ENGINEER \u2014 Done.",
+      "[14:09:22] MODEL TRAINER \u2014 Training 3 models in parallel: ['lightgbm', 'xgboost', 'random_forest']",
+      "[14:09:22] MODEL TRAINER \u2014 Train: 5634, Test: 1409 rows | scale_pos_weight=2.768",
+      "[14:09:22] MODEL TRAINER \u2014 LIGHTGBM: accuracy=0.7452, f1=0.7578, precision=0.7943, recall=0.7452, auc=0.8322 | CV f1_weighted=0.7658\u00b10.0052 (37.37s)",
+      "[14:09:22] MODEL TRAINER \u2014 XGBOOST: accuracy=0.7637, f1=0.7727, precision=0.7925, recall=0.7637, auc=0.8328 | CV f1_weighted=0.7733\u00b10.0097 (28.52s)",
+      "[14:09:22] MODEL TRAINER \u2014 RANDOM_FOREST: accuracy=0.7551, f1=0.7668, precision=0.7997, recall=0.7551, auc=0.836 | CV f1_weighted=0.7765\u00b10.01 (23.85s)",
+      "[14:09:22] MODEL TRAINER \u2014 Done.",
+      "[14:10:00] EVALUATOR \u2014 Comparing 3 models...",
+      "[14:10:00] EVALUATOR \u2014 Winner: random_forest (auc=0.836)",
+      "[14:10:00] EVALUATOR \u2014 Justification: Random_forest was selected as the winner because it achieved the highest AUC (0.836) among all candidates, edging out xgboost (0.8328) and lightgbm (0.8322). It also delivered the best cross-validation mean (0.7765) and strong precision (0.7997), while training faster (23.85s) than both lightgbm and xgboost, making it an efficient and reliable choice despite a slightly higher cv_std and memory footprint (32.96MB) compared to the boosting models.",
+      "[14:10:00] EVALUATOR \u2014 Saved model.pkl + feature_schema.json",
+      "[14:10:00] EVALUATOR \u2014 Running SHAP on random_forest (test set)...",
+      "[14:10:00] EVALUATOR \u2014 BIAS WARNING: Sensitive features detected: ['gender']. Evaluate random_forest for disparate impact before deployment. Consider fairness metrics: demographic parity, equalized odds.",
+      "[14:10:00] EVALUATOR \u2014 Done.",
+      "[14:10:24] CODE GENERATOR \u2014 Writing production pipeline code...",
+      "[14:10:24] CODE GENERATOR \u2014 Generated 18123 chars. Validating in sandbox...",
+      "[14:10:24] CODE GENERATOR \u2014 Warning: syntax validation inconclusive.",
+      "[14:10:24] CODE GENERATOR \u2014 Done.",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 Generating API endpoint and Dockerfile...",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 FastAPI endpoint generated.",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 Dockerfile generated.",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 OpenAPI spec generated.",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 All artifacts saved to outputs/",
+      "[14:10:52] DEPLOYMENT AGENT \u2014 Done.",
+      "[14:10:52] PIPELINE COMPLETE \u2014 Winner: random_forest | Task: classification"
+    ]
+  },
+  "artifacts": [
+    "pipeline.py",
+    "requirements.txt",
+    "fastapi_endpoint.py",
+    "Dockerfile",
+    "openapi_spec.json",
+    "shap_summary.png",
+    "model.pkl",
+    "feature_schema.json"
+  ]
+}

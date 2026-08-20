@@ -1,0 +1,82 @@
+[
+  {
+    "name": "customerID",
+    "dtype": "object"
+  },
+  {
+    "name": "gender",
+    "dtype": "object"
+  },
+  {
+    "name": "SeniorCitizen",
+    "dtype": "int64"
+  },
+  {
+    "name": "Partner",
+    "dtype": "object"
+  },
+  {
+    "name": "Dependents",
+    "dtype": "object"
+  },
+  {
+    "name": "tenure",
+    "dtype": "int64"
+  },
+  {
+    "name": "PhoneService",
+    "dtype": "object"
+  },
+  {
+    "name": "MultipleLines",
+    "dtype": "object"
+  },
+  {
+    "name": "InternetService",
+    "dtype": "object"
+  },
+  {
+    "name": "OnlineSecurity",
+    "dtype": "object"
+  },
+  {
+    "name": "OnlineBackup",
+    "dtype": "object"
+  },
+  {
+    "name": "DeviceProtection",
+    "dtype": "object"
+  },
+  {
+    "name": "TechSupport",
+    "dtype": "object"
+  },
+  {
+    "name": "StreamingTV",
+    "dtype": "object"
+  },
+  {
+    "name": "StreamingMovies",
+    "dtype": "object"
+  },
+  {
+    "name": "Contract",
+    "dtype": "object"
+  },
+  {
+    "name": "PaperlessBilling",
+    "dtype": "object"
+  },
+  {
+    "name": "PaymentMethod",
+    "dtype": "object"
+  },
+  {
+    "name": "MonthlyCharges",
+    "dtype": "float64"
+  },
+  {
+    "name": "TotalCharges",
+    "dtype": "object"
+  }
+]

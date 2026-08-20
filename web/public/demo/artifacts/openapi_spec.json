@@ -1,0 +1,162 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Random_Forest ML Inference API",
+    "version": "1.0.0",
+    "description": "AutoML-generated inference endpoint for classification on 'Churn'"
+  },
+  "paths": {
+    "/predict": {
+      "post": {
+        "summary": "Run inference",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "customerID": {
+                    "type": "string",
+                    "description": "Feature: customerID (object)"
+                  },
+                  "gender": {
+                    "type": "string",
+                    "description": "Feature: gender (object)"
+                  },
+                  "SeniorCitizen": {
+                    "type": "integer",
+                    "description": "Feature: SeniorCitizen (int64)"
+                  },
+                  "Partner": {
+                    "type": "string",
+                    "description": "Feature: Partner (object)"
+                  },
+                  "Dependents": {
+                    "type": "string",
+                    "description": "Feature: Dependents (object)"
+                  },
+                  "tenure": {
+                    "type": "integer",
+                    "description": "Feature: tenure (int64)"
+                  },
+                  "PhoneService": {
+                    "type": "string",
+                    "description": "Feature: PhoneService (object)"
+                  },
+                  "MultipleLines": {
+                    "type": "string",
+                    "description": "Feature: MultipleLines (object)"
+                  },
+                  "InternetService": {
+                    "type": "string",
+                    "description": "Feature: InternetService (object)"
+                  },
+                  "OnlineSecurity": {
+                    "type": "string",
+                    "description": "Feature: OnlineSecurity (object)"
+                  },
+                  "OnlineBackup": {
+                    "type": "string",
+                    "description": "Feature: OnlineBackup (object)"
+                  },
+                  "DeviceProtection": {
+                    "type": "string",
+                    "description": "Feature: DeviceProtection (object)"
+                  },
+                  "TechSupport": {
+                    "type": "string",
+                    "description": "Feature: TechSupport (object)"
+                  },
+                  "StreamingTV": {
+                    "type": "string",
+                    "description": "Feature: StreamingTV (object)"
+                  },
+                  "StreamingMovies": {
+                    "type": "string",
+                    "description": "Feature: StreamingMovies (object)"
+                  },
+                  "Contract": {
+                    "type": "string",
+                    "description": "Feature: Contract (object)"
+                  },
+                  "PaperlessBilling": {
+                    "type": "string",
+                    "description": "Feature: PaperlessBilling (object)"
+                  },
+                  "PaymentMethod": {
+                    "type": "string",
+                    "description": "Feature: PaymentMethod (object)"
+                  },
+                  "MonthlyCharges": {
+                    "type": "number",
+                    "description": "Feature: MonthlyCharges (float64)"
+                  },
+                  "TotalCharges": {
+                    "type": "string",
+                    "description": "Feature: TotalCharges (object)"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful prediction",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "prediction": {
+                      "type": "integer"
+                    },
+                    "model_version": {
+                      "type": "string"
+                    },
+                    "probability": {
+                      "type": "number",
+                      "description": "Probability of the positive class"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation error"
+          },
+          "500": {
+            "description": "Internal server error"
+          }
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "summary": "Health check",
+        "responses": {
+          "200": {
+            "description": "Service is healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string"
+                    },
+                    "model_loaded": {
+                      "type": "boolean"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
