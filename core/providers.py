@@ -19,6 +19,7 @@ Usage:
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from langchain_anthropic import ChatAnthropic
@@ -59,6 +60,15 @@ CODEGEN_MODELS: dict[str, str] = {
 _GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
+# Anthropic models that reject `temperature` outright. The Claude 5 family
+# dropped sampling controls; 4.x and earlier still take them.
+_NO_TEMPERATURE = re.compile(r"^claude-[a-z]+-5(?:$|-)")
+
+
+def _rejects_temperature(model: str) -> bool:
+    return bool(_NO_TEMPERATURE.match(model.strip()))
+
+
 def get_llm(
     provider: str,
     api_key: str,
@@ -90,12 +100,19 @@ def get_llm(
         model = PROVIDER_DEFAULTS.get(provider, "")
 
     if provider == "anthropic":
+        anthropic_kwargs: dict[str, Any] = dict(kwargs)
+        # Claude 5 removed the knob: sending it is a hard 400, not a warning,
+        # so every agent call failed the moment the catalogue moved to
+        # claude-sonnet-5. Claude 4.x still accepts it, and the agents rely on
+        # temperature=0 for reproducible plans, so it is dropped per-model
+        # rather than everywhere.
+        if not _rejects_temperature(model):
+            anthropic_kwargs["temperature"] = temperature
         return ChatAnthropic(
             api_key=api_key,  # type: ignore[arg-type]
             model=model,
-            temperature=temperature,
             max_tokens=max_tokens,
-            **kwargs,
+            **anthropic_kwargs,
         )
 
     if provider == "openai":
