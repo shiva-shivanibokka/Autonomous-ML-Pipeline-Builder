@@ -8,11 +8,11 @@ import ResultsPanel from "@/components/ResultsPanel";
 import InfoTip from "@/components/InfoTip";
 import { API_BASE, getLogs, getResult, getStatus, runPipeline } from "@/lib/api";
 import {
-  DEMO_MODE,
   DEMO_PIPELINE_ID,
   REPLAY_SECONDS,
   loadDemoRun,
   playDemoRun,
+  shouldAutoplayReplay,
   type DemoRun,
 } from "@/lib/demo";
 import { AGENTS, type ResultResponse, type RunStatus } from "@/lib/types";
@@ -154,9 +154,10 @@ export default function Home() {
     });
   }, [demoRun, stopPolling]);
 
-  // On a hosted build there is no backend to talk to, so play automatically.
+  // Hosted with no backend configured: play automatically, because there is
+  // nothing else this page could do.
   useEffect(() => {
-    if (DEMO_MODE && demoRun && !started) startReplay();
+    if (demoRun && !started && shouldAutoplayReplay()) startReplay();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [demoRun]);
 
@@ -223,7 +224,7 @@ export default function Home() {
 
       {/* What you are looking at — shown whenever a recording is available,
           so a replay is never mistaken for a live pipeline. */}
-      {demoChecked && (demoRun || DEMO_MODE) && (
+      {demoChecked && demoRun && (
         <ReplayBanner run={demoRun} onReplay={startReplay} playing={running} />
       )}
 

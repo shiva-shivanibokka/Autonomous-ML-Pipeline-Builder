@@ -269,12 +269,15 @@ every push to `main` redeploys:
 | Setting | Value |
 |---|---|
 | Root Directory | `web` |
-| `NEXT_PUBLIC_DEMO_MODE` | `1` |
 | `NEXT_PUBLIC_API_BASE_URL` | leave unset |
 
-With `NEXT_PUBLIC_DEMO_MODE=1` the console autoplays the recording instead of
-reaching for an API that is not there. Locally it stays off, and the replay is a
-button next to the live controls.
+That is the whole configuration. With no backend URL set, a page served from
+anywhere other than localhost knows there is nothing to talk to and autoplays
+the recording; running locally it stays off and the replay sits on a button next
+to the live controls. Inferring it means forgetting a setting cannot produce a
+console that quietly hammers `localhost:8000` on someone else's machine.
+
+`NEXT_PUBLIC_DEMO_MODE=1` still forces replay mode if you want it explicit.
 
 If a recording is ever missing, the page says so rather than inventing one.
 

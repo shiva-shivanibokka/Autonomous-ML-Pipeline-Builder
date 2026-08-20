@@ -47,9 +47,36 @@ export interface DemoRun {
  */
 export const REPLAY_SECONDS = 30;
 
-export const DEMO_MODE =
+const DEMO_MODE_ENV =
   process.env.NEXT_PUBLIC_DEMO_MODE === "1" ||
   process.env.NEXT_PUBLIC_DEMO_MODE === "true";
+
+const API_BASE_CONFIGURED = Boolean(process.env.NEXT_PUBLIC_API_BASE_URL);
+
+const LOCAL_HOSTS = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/;
+
+/**
+ * Should the page play the recording instead of waiting for a run?
+ *
+ * Yes when it is explicitly asked for, and also whenever the page is served
+ * from somewhere that is not this machine with no backend URL configured —
+ * because then there is provably nothing to talk to. `API_BASE` falls back to
+ * http://localhost:8000, which is a real address on a developer's laptop and a
+ * dead one on a hosted deploy.
+ *
+ * Inferring it means a deploy cannot be silently wrong: forgetting the
+ * environment variable used to produce a console that sat there hammering
+ * localhost until it gave up, rather than showing the demo it was built for.
+ */
+export function shouldAutoplayReplay(): boolean {
+  if (DEMO_MODE_ENV) return true;
+  if (API_BASE_CONFIGURED) return false;
+  if (typeof window === "undefined") return false;
+  return !LOCAL_HOSTS.test(window.location.hostname);
+}
+
+/** True when the page has no backend it could reach. */
+export const DEMO_MODE = DEMO_MODE_ENV;
 
 let cached: DemoRun | null | undefined;
 
