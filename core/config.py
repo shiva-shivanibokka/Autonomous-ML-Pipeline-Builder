@@ -22,31 +22,30 @@ logger = logging.getLogger(__name__)
 
 def _load_env() -> None:
     """
-    Load .env, and say so when it disagrees with the real environment.
+    Load .env, and name anything in it the environment is overriding.
 
-    `load_dotenv()` will not overwrite a variable that is already set, which
-    makes a stale shell or Windows user-level variable silently beat the file
-    the README tells you to edit. That failure is invisible and expensive: it
-    looks exactly like a bad key, because the value being sent really is a
+    The environment wins — that is what lets CI and `EXECUTION_BACKEND=... python
+    ...` work, and there is no .env in a container anyway. What was missing is
+    that `load_dotenv()` skips an already-set variable *silently*: edit the key
+    in .env, and if a stale shell or Windows user-level variable holds the old
+    one, nothing happens and nothing says why. The symptom is
+    indistinguishable from a bad key, because the value being sent really is a
     different key from the one you just pasted in.
 
-    So: the file wins, and any variable it had to override is named in a
-    warning. Deployed there is no .env at all (see .dockerignore /
-    .gcloudignore), so real environment variables still rule in production.
+    So the precedence stays conventional and the conflict gets announced.
     """
     from_file = dotenv_values()
-    shadowed = [
-        k
-        for k, v in from_file.items()
-        if v and k in os.environ and os.environ[k] != v
+    overridden = [
+        k for k, v in from_file.items() if v and k in os.environ and os.environ[k] != v
     ]
-    load_dotenv(override=True)
-    if shadowed:
+    load_dotenv()
+    if overridden:
         logger.warning(
-            "Using .env for %s - the environment already had a different value "
-            "for %s. If you meant the environment to win, remove it from .env.",
-            ", ".join(shadowed),
-            "them" if len(shadowed) > 1 else "it",
+            "Ignoring .env for %s - the environment already sets %s to something "
+            "else, and the environment wins. Unset %s if you meant .env to apply.",
+            ", ".join(overridden),
+            "them" if len(overridden) > 1 else "it",
+            "them" if len(overridden) > 1 else "it",
         )
 
 
@@ -140,6 +139,19 @@ class Settings(BaseSettings):
                 + "\n  - ".join(problems)
             )
 
+    @staticmethod
+    def _is_real(value: str) -> bool:
+        """
+        True when a key looks like an actual credential.
+
+        .env.example ships placeholders — `sk-ant-...`, `sk-...`, `gsk_...` —
+        and copying it to .env leaves them in place. A bare truthiness check
+        reads those as configured, which is how the RAG retriever ended up
+        sending "sk-..." to OpenAI and 401-ing on every knowledge-base build.
+        """
+        v = (value or "").strip()
+        return bool(v) and not v.endswith("...") and len(v) > 20
+
     def has_provider_key(self, provider: str) -> bool:
         """Check whether a valid API key is configured for the given provider."""
         mapping = {
@@ -147,7 +159,7 @@ class Settings(BaseSettings):
             "openai": self.openai_api_key,
             "groq": self.groq_api_key,
         }
-        return bool(mapping.get(provider, "").strip())
+        return self._is_real(mapping.get(provider, ""))
 
     def get_api_key(self, provider: str) -> str:
         """Return the API key for a given provider, or empty string."""

@@ -10,6 +10,7 @@ in natural language.
 from __future__ import annotations
 
 import logging
+import warnings
 from datetime import datetime
 
 import numpy as np
@@ -55,7 +56,12 @@ def _profile_dataframe(df: pd.DataFrame) -> dict:
     # default) and only produced a deprecation warning on every column.
     for col in categorical_cols[:]:
         try:
-            pd.to_datetime(df[col])
+            # This probe is expected to fail on most columns, and pandas warns
+            # once per column about falling back to dateutil. The failure is
+            # the answer here, so the warning is noise.
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore", UserWarning)
+                pd.to_datetime(df[col])
         except (ValueError, TypeError):
             continue  # ordinary text column — not a date
         datetime_cols.append(col)

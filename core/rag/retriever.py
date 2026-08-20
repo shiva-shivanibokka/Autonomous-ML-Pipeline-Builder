@@ -91,7 +91,7 @@ def _build(knowledge_dir: Path) -> KnowledgeBase:
     corpus = [d["text"] for d in docs]
 
     # Prefer dense embeddings when an OpenAI key is available.
-    if settings.openai_api_key.strip():
+    if settings.has_provider_key("openai"):
         try:
             matrix = np.array(_openai_embed(corpus))
             logger.info("Knowledge base built with OpenAI embeddings (%d docs)", len(docs))
