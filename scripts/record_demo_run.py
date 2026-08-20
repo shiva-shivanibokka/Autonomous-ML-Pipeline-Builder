@@ -85,7 +85,7 @@ def _copy_artifacts(output_dir: Path) -> list[str]:
             continue
         size_mb = src.stat().st_size / 1e6
         if size_mb > MAX_ARTIFACT_MB:
-            print(f"  - {name}: {size_mb:.1f} MB, over the {MAX_ARTIFACT_MB} MB cap — skipped")
+            print(f"  - {name}: {size_mb:.1f} MB, over the {MAX_ARTIFACT_MB} MB cap - skipped")
             continue
         shutil.copy2(src, ARTIFACT_DIR / name)
         copied.append(name)
@@ -178,7 +178,7 @@ def main() -> int:
 
     if status != "completed":
         print(f"\nRun ended as '{status}': {final_state.get('error')}")
-        print("Not recording a failed run — fix the cause and try again.")
+        print("Not recording a failed run - fix the cause and try again.")
         return 1
 
     # Close the timeline so the replay ends on the real final state.
