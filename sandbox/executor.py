@@ -183,6 +183,41 @@ def _output_csv_for(csv_path: str) -> str:
     return str(p.with_name(f"{p.stem}_processed{p.suffix or '.csv'}"))
 
 
+# Environment variables the child interpreter actually needs. Everything else,
+# notably ANTHROPIC_API_KEY / OPENAI_API_KEY / GROQ_API_KEY / E2B_API_KEY, is
+# withheld: the script is LLM-generated and used to inherit the full parent
+# environment, so it could read (or exfiltrate) every provider key.
+_SAFE_ENV_KEYS = (
+    "PATH",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+    "LANG",
+    "LC_ALL",
+)
+
+
+def _sandbox_env(workdir: str) -> dict[str, str]:
+    """A minimal environment for running generated code: no secrets, temp HOME."""
+    env = {k: os.environ[k] for k in _SAFE_ENV_KEYS if k in os.environ}
+    env.update(
+        {
+            "HOME": workdir,
+            "USERPROFILE": workdir,
+            "TEMP": workdir,
+            "TMP": workdir,
+            "MPLCONFIGDIR": workdir,
+            "PYTHONHASHSEED": "0",
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+    return env
+
+
 def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
     """Execute code in a local subprocess with timeout (fallback for local dev)."""
     output_csv = _output_csv_for(csv_path)
@@ -191,11 +226,12 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
         code_with_path, "OUTPUT_CSV_PATH", output_csv
     )
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".py", mode="w", delete=False, encoding="utf-8"
-    ) as f:
+    # A throwaway working directory per run: the script's cwd, HOME and TEMP,
+    # so relative writes land somewhere disposable rather than in the repo.
+    workdir = tempfile.mkdtemp(prefix="amlpb_exec_")
+    script_path = os.path.join(workdir, "generated.py")
+    with open(script_path, "w", encoding="utf-8") as f:
         f.write(code_with_path)
-        script_path = f.name
 
     # A stale output from an earlier attempt must not count as this attempt's.
     if output_csv and Path(output_csv).exists():
@@ -209,7 +245,11 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             [sys.executable, script_path],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
+            cwd=workdir,
+            env=_sandbox_env(workdir),
         )
         success = result.returncode == 0
         return {
@@ -231,7 +271,9 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             "output_csv_path": "",
         }
     finally:
-        os.unlink(script_path)
+        import shutil
+
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────

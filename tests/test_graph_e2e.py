@@ -186,3 +186,19 @@ def test_feature_engineering_without_output_fails_loudly(tmp_path):
     assert "did not write its output" in res["last_error"]
 
 
+def test_generated_code_does_not_see_api_keys(tmp_path):
+    from sandbox.executor import _execute_subprocess
+
+    code = (
+        "import os\n"
+        "leaked = sorted(k for k in os.environ if 'KEY' in k or 'TOKEN' in k)\n"
+        "print('LEAKED=' + ','.join(leaked))\n"
+        "print('CWD=' + os.getcwd())\n"
+    )
+    with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-secret", "GROQ_API_KEY": "g"}):
+        res = _execute_subprocess(code, "", 30)
+    assert res["success"], res["stderr"]
+    assert "LEAKED=\n" in res["stdout"] or res["stdout"].startswith("LEAKED=\n")
+    assert str(tmp_path) not in res["stdout"]
+
+
