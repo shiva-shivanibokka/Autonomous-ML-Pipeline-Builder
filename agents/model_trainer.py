@@ -357,7 +357,7 @@ def run_model_trainer(state: AgentState) -> dict:
     logs = list(state.get("logs", []))
 
     try:
-        plan = state.get("_orchestrator_plan") or {}
+        plan = state.get("orchestrator_plan") or {}
         profile = state.get("dataset_profile") or {}
         feature_result = state.get("feature_result") or {}
 

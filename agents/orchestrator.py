@@ -114,8 +114,10 @@ def run_orchestrator(state: AgentState) -> dict:
             "current_step": "data_analyst",
             "dataset_profile": updated_profile,
             "logs": logs,
-            # Store plan details as tags so model_trainer can read them
-            "_orchestrator_plan": {
+            # A declared AgentState key. This used to be "_orchestrator_plan",
+            # which is not in the schema, so LangGraph dropped it and the trainer
+            # and evaluator always used their defaults (see agents/state.py).
+            "orchestrator_plan": {
                 "task_type": plan.task_type,
                 "primary_metric": plan.primary_metric,
                 "target_column": plan.target_column,

@@ -296,7 +296,7 @@ def run_evaluator(state: AgentState) -> dict:
     try:
         model_results = state.get("model_results", {})
         profile = state.get("dataset_profile") or {}
-        plan = state.get("_orchestrator_plan") or {}
+        plan = state.get("orchestrator_plan") or {}
 
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "")

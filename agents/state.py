@@ -88,6 +88,15 @@ class DeploymentArtifacts(TypedDict, total=False):
     mlflow_model_uri: str
 
 
+class OrchestratorPlan(TypedDict, total=False):
+    """The orchestrator's plan, read by the trainer and evaluator."""
+
+    task_type: str
+    primary_metric: str
+    target_column: str
+    suggested_models: list[str]
+
+
 class AgentState(TypedDict, total=False):
     """
     The complete pipeline state passed between all LangGraph nodes.
@@ -111,6 +120,11 @@ class AgentState(TypedDict, total=False):
     error: Optional[str]  # Set if any agent fails fatally
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
+    # Must be a declared key: LangGraph drops any key a node returns that is not
+    # in the state schema. It used to be returned as "_orchestrator_plan", which
+    # was silently discarded, so the trainer and evaluator always fell back to
+    # their hard-coded defaults and the LLM's model/metric choice did nothing.
+    orchestrator_plan: Optional[OrchestratorPlan]
     dataset_profile: Optional[DatasetProfile]
     feature_result: Optional[FeatureEngineeringResult]
     model_results: dict[str, ModelResult]  # model_name → result

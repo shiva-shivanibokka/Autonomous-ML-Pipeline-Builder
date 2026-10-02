@@ -45,7 +45,7 @@ def _make_state(tmp_path: Path, n=400) -> dict:
             "target_column": "target",
             "is_imbalanced": False,
         },
-        "_orchestrator_plan": {
+        "orchestrator_plan": {
             "task_type": "classification",
             "primary_metric": "auc",
             "target_column": "target",
