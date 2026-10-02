@@ -1,0 +1,10 @@
+.....                                                                    [100%]
+============================== warnings summary ===============================
+tests/test_e2e_from_commit5.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit5.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+5 passed, 2 warnings in 28.66s
+exit=0

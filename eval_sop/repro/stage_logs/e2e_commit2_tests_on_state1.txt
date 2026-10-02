@@ -1,0 +1,57 @@
+.FF                                                                      [100%]
+================================== FAILURES ===================================
+_________________ test_orchestrator_sees_the_dataset_columns __________________
+
+csv_path = '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-648\\test_orchestrator_sees_the_dat0\\data.csv'
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-648/test_orchestrator_sees_the_dat0')
+
+    def test_orchestrator_sees_the_dataset_columns(csv_path, tmp_path):
+        fake = FakeLLM()
+        _run_graph(csv_path, tmp_path, fake)
+        orchestrator_prompt = fake.prompts[0]
+>       assert "'label'" in orchestrator_prompt and "'x1'" in orchestrator_prompt
+E       assert ("'label'" in 'Business problem: Predict label\n\nDataset summary:\n  - Rows: unknown\n  - Columns: unknown\n  - Numeric columns: []...: {}\n\nProduce a JSON pipeline plan with keys: task_type, primary_metric, target_column, suggested_models, reasoning.')
+
+tests\test_e2e_from_commit2.py:138: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  agents.evaluator:evaluator.py:260 SHAP explainability failed (non-fatal): Numba needs NumPy 2.4 or less. Got NumPy 2.5.
+___________ test_orchestrator_rejects_a_target_that_is_not_a_column ___________
+
+csv_path = '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-648\\test_orchestrator_rejects_a_ta0\\data.csv'
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-648/test_orchestrator_rejects_a_ta0')
+
+    def test_orchestrator_rejects_a_target_that_is_not_a_column(csv_path, tmp_path):
+        from agents.orchestrator import run_orchestrator
+    
+        bad = FakeLLM()
+        with patch("agents.orchestrator.get_llm", return_value=bad), patch.dict(
+            PLAN, {"target_column": "no_such_column"}
+        ):
+            out = run_orchestrator(
+                {
+                    "csv_path": csv_path,
+                    "business_problem": "Predict label",
+                    "provider": "groq",
+                    "api_key": "x",
+                    "model_name": "m",
+                    "logs": [],
+                }
+            )
+>       assert out.get("error") and "no_such_column" in out["error"]
+E       AssertionError: assert (None)
+E        +  where None = <built-in method get of dict object at 0x00000251FE644740>('error')
+E        +    where <built-in method get of dict object at 0x00000251FE644740> = {'current_step': 'data_analyst', 'dataset_profile': {'target_column': 'no_such_column', 'task_type': 'classification'}... 'suggested_models': ['logistic_regression', 'mlp'], 'target_column': 'no_such_column', 'task_type': 'classification'}}.get
+
+tests\test_e2e_from_commit2.py:159: AssertionError
+============================== warnings summary ===============================
+tests/test_e2e_from_commit2.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit2.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_from_commit2.py::test_orchestrator_sees_the_dataset_columns
+FAILED tests/test_e2e_from_commit2.py::test_orchestrator_rejects_a_target_that_is_not_a_column
+2 failed, 1 passed, 2 warnings in 50.29s
+exit=1

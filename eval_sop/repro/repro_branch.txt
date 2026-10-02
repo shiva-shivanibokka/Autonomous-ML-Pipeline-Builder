@@ -1,0 +1,10 @@
+code root: <SCRATCH>\wt\Autonomous-ML-Pipeline-Builder
+OK   B1 plan dropped between nodes: LLM planned ['logistic_regression', 'mlp'], trainer trained ['logistic_regression', 'mlp']
+OK   B1b evaluator ignores planned metric: planned f1, evaluator ranked on f1
+OK   B2 orchestrator sees no dataset profile: orchestrator prompt: - All columns: ['x1', 'x2', 'label'] |   - Rows: 300 |   - Columns: 3 |   - Numeric columns: ['x1', 'x2', 'label'] |   - Categorical columns: [] |   - Datetime columns: [] |   - Missing values: {}
+OK   B3a FE without output silently falls back to raw CSV: error='Feature Engineer failed: Feature engineering failed after 3 attempts. ' transformed_csv_path==raw input: False
+OK   B3b FE without output silently reuses a stale output from an earlier run: error='Feature Engineer failed: Feature engineering failed after 3 attempts. ' transformed_csv_path=-
+OK   B4 winner chosen on holdout test metric: winner=cv_best
+OK   B4b CV scores a different metric than selection: plan=auc, cv_metric=roc_auc
+OK   B5 subprocess inherits API keys: visible to generated code: []
+BUG  B6 leakage_warnings hard-coded to []: literal present in agents/feature_engineer.py

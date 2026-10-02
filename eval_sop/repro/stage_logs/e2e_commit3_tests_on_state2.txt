@@ -1,0 +1,38 @@
+...F                                                                     [100%]
+================================== FAILURES ===================================
+____________ test_feature_engineering_without_output_fails_loudly _____________
+
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-650/test_feature_engineering_witho0')
+
+    def test_feature_engineering_without_output_fails_loudly(tmp_path):
+        """A script that runs cleanly but writes nothing must not fall back to raw data."""
+        from unittest.mock import MagicMock
+    
+        from sandbox.executor import execute_with_retry
+    
+        csv = tmp_path / "d.csv"
+        pd.DataFrame({"a": [1, 2]}).to_csv(csv, index=False)
+        llm = MagicMock()
+        llm.invoke.return_value = MagicMock(content="print('still nothing')")
+        with patch("sandbox.executor.settings") as s:
+            s.execution_backend = "subprocess"
+            s.e2b_api_key = ""
+            s.allow_local_exec = True
+            s.sandbox_timeout_seconds = 30
+>           res = execute_with_retry(
+                "print('no output written')", str(csv), llm, max_retries=2, require_output=True
+            )
+E           TypeError: execute_with_retry() got an unexpected keyword argument 'require_output'
+
+tests\test_e2e_from_commit3.py:181: TypeError
+============================== warnings summary ===============================
+tests/test_e2e_from_commit3.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit3.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_from_commit3.py::test_feature_engineering_without_output_fails_loudly
+1 failed, 3 passed, 2 warnings in 28.36s
+exit=1

@@ -1,0 +1,10 @@
+code root: <SCRATCH>\wt\orig-8987d6f
+BUG  B1 plan dropped between nodes: LLM planned ['logistic_regression', 'mlp'], trainer trained ['lightgbm', 'random_forest', 'xgboost']
+BUG  B1b evaluator ignores planned metric: planned f1, evaluator ranked on auc
+BUG  B2 orchestrator sees no dataset profile: orchestrator prompt: - Rows: unknown |   - Columns: unknown |   - Numeric columns: [] |   - Categorical columns: [] |   - Datetime columns: [] |   - Missing values: {}
+BUG  B3a FE without output silently falls back to raw CSV: error='None' transformed_csv_path==raw input: True
+BUG  B3b FE without output silently reuses a stale output from an earlier run: error='None' transformed_csv_path=data_processed.csv
+BUG  B4 winner chosen on holdout test metric: winner=test_best
+BUG  B4b CV scores a different metric than selection: plan=auc, cv_metric=f1_weighted
+BUG  B5 subprocess inherits API keys: visible to generated code: [ANTHROPIC_API_KEY]
+BUG  B6 leakage_warnings hard-coded to []: literal present in agents/feature_engineer.py

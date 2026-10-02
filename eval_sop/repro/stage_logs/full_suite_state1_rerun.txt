@@ -1,0 +1,39 @@
+.......................................s................................ [ 85%]
+............                                                             [100%]
+============================== warnings summary ===============================
+..\..\..\..\..\..\..\..\..\anaconda3\Lib\site-packages\fastapi\testclient.py:1
+  <HOME>\anaconda3\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_agents.py::TestDataAnalyst::test_profile_dataframe_numeric_detection
+tests/test_agents.py::TestDataAnalyst::test_profile_dataframe_numeric_detection
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+tests/test_agents.py::TestModelTrainer::test_make_model_lightgbm_classification
+  <HOME>\anaconda3\Lib\site-packages\dask\dataframe\utils.py:320: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+    "m": np.timedelta64(1),
+
+tests/test_ml_pipeline.py::test_trainer_produces_fitted_pipelines_with_cv
+  <HOME>\anaconda3\Lib\site-packages\mlflow\tracking\_tracking_service\utils.py:184: FutureWarning: The filesystem tracking backend (e.g., './mlruns') is deprecated as of February 2026. Consider transitioning to a database backend (e.g., 'sqlite:///mlflow.db') to take advantage of the latest MLflow features. See https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store for migration guidance.
+    return FileStore(store_uri, store_uri)
+
+tests/test_ml_pipeline.py: 14 warnings
+  <HOME>\anaconda3\Lib\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+    warnings.warn(
+
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+  <HOME>\anaconda3\Lib\site-packages\joblib\numpy_pickle.py:207: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    array.shape = self.shape
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+83 passed, 1 skipped, 27 warnings in 28.40s
+exit=0
