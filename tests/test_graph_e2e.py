@@ -131,3 +131,31 @@ def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path
     assert ev["primary_metric"] == "f1"
 
 
+def test_orchestrator_sees_the_dataset_columns(csv_path, tmp_path):
+    fake = FakeLLM()
+    _run_graph(csv_path, tmp_path, fake)
+    orchestrator_prompt = fake.prompts[0]
+    assert "'label'" in orchestrator_prompt and "'x1'" in orchestrator_prompt
+    assert "Rows: 300" in orchestrator_prompt
+
+
+def test_orchestrator_rejects_a_target_that_is_not_a_column(csv_path, tmp_path):
+    from agents.orchestrator import run_orchestrator
+
+    bad = FakeLLM()
+    with patch("agents.orchestrator.get_llm", return_value=bad), patch.dict(
+        PLAN, {"target_column": "no_such_column"}
+    ):
+        out = run_orchestrator(
+            {
+                "csv_path": csv_path,
+                "business_problem": "Predict label",
+                "provider": "groq",
+                "api_key": "x",
+                "model_name": "m",
+                "logs": [],
+            }
+        )
+    assert out.get("error") and "no_such_column" in out["error"]
+
+

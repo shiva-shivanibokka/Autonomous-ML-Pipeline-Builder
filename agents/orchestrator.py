@@ -49,6 +49,53 @@ SYSTEM_PROMPT = build_system_prompt(
 )
 
 
+_KNOWN_MODELS = {
+    "lightgbm",
+    "xgboost",
+    "random_forest",
+    "mlp",
+    "logistic_regression",
+    "linear_regression",
+}
+_METRIC_ALIASES = {
+    "roc_auc": "auc",
+    "auc_roc": "auc",
+    "roc-auc": "auc",
+    "auroc": "auc",
+    "f1_score": "f1",
+    "f1_weighted": "f1",
+    "f1_macro": "f1",
+}
+_TASK_METRICS = {
+    "classification": {"auc", "f1"},
+    "regression": {"rmse", "r2"},
+    "time_series": {"mape", "rmse", "r2"},
+}
+
+
+def _normalise_metric(metric: str, task_type: str) -> str:
+    """Map the LLM's metric name onto one the trainer and evaluator understand."""
+    m = (metric or "").strip().lower()
+    m = _METRIC_ALIASES.get(m, m)
+    if m in _TASK_METRICS.get(task_type, {"auc", "f1"}):
+        return m
+    fallback = "auc" if task_type == "classification" else "rmse"
+    logger.warning("Unsupported metric %r for %s; using %s", metric, task_type, fallback)
+    return fallback
+
+
+def _normalise_models(models: list[str], task_type: str) -> list[str]:
+    """Keep only models the trainer can build; never return an empty list."""
+    out: list[str] = []
+    for m in models or []:
+        key = str(m).strip().lower().replace(" ", "_").replace("-", "_")
+        if key == "linear_regression" and task_type == "classification":
+            key = "logistic_regression"
+        if key in _KNOWN_MODELS and key not in out:
+            out.append(key)
+    return out or ["lightgbm", "xgboost", "random_forest"]
+
+
 def run_orchestrator(state: AgentState) -> dict:
     """
     LangGraph node: plan the full pipeline from the business problem.
@@ -68,11 +115,25 @@ def run_orchestrator(state: AgentState) -> dict:
             model=state["model_name"],
         )
 
-        # Build the prompt
-        dataset_profile = state.get("dataset_profile") or {}
+        # Profile the CSV BEFORE planning. The orchestrator runs first in the
+        # graph, so state["dataset_profile"] is always None here; the prompt
+        # used to say "Rows: unknown ... Numeric columns: []" and the LLM had to
+        # guess the target column from the business-problem prose alone.
+        dataset_profile = dict(state.get("dataset_profile") or {})
+        columns: list[str] = []
+        if state.get("csv_path"):
+            import pandas as pd
+
+            from agents.data_analyst import _profile_dataframe
+
+            _df = pd.read_csv(state["csv_path"])
+            columns = [str(c) for c in _df.columns]
+            dataset_profile = {**_profile_dataframe(_df), **dataset_profile}
+
         user_prompt = (
             f"Business problem: {state['business_problem']}\n\n"
             f"Dataset summary:\n"
+            f"  - All columns: {columns}\n"
             f"  - Rows: {dataset_profile.get('n_rows', 'unknown')}\n"
             f"  - Columns: {dataset_profile.get('n_cols', 'unknown')}\n"
             f"  - Numeric columns: {dataset_profile.get('numeric_cols', [])}\n"
@@ -95,12 +156,22 @@ def run_orchestrator(state: AgentState) -> dict:
         if plan is None:
             raise ValueError(f"Could not parse orchestrator plan from: {raw[:300]}")
 
+        # Fail loudly on a target that does not exist, instead of letting the
+        # trainer discover it three agents (and several LLM calls) later.
+        if columns and plan.target_column not in columns:
+            raise ValueError(
+                f"Planned target column {plan.target_column!r} is not a column of "
+                f"the dataset. Columns: {columns}"
+            )
+        primary_metric = _normalise_metric(plan.primary_metric, plan.task_type)
+        suggested_models = _normalise_models(plan.suggested_models, plan.task_type)
+
         logs.append(f"[{timestamp}] ORCHESTRATOR — Task type: {plan.task_type}")
         logs.append(
-            f"[{timestamp}] ORCHESTRATOR — Models to train: {', '.join(plan.suggested_models)}"
+            f"[{timestamp}] ORCHESTRATOR — Models to train: {', '.join(suggested_models)}"
         )
         logs.append(
-            f"[{timestamp}] ORCHESTRATOR — Primary metric: {plan.primary_metric}"
+            f"[{timestamp}] ORCHESTRATOR — Primary metric: {primary_metric}"
         )
         logs.append(f"[{timestamp}] ORCHESTRATOR — Reasoning: {plan.reasoning}")
         logs.append(f"[{timestamp}] ORCHESTRATOR — Done.")
@@ -119,9 +190,9 @@ def run_orchestrator(state: AgentState) -> dict:
             # and evaluator always used their defaults (see agents/state.py).
             "orchestrator_plan": {
                 "task_type": plan.task_type,
-                "primary_metric": plan.primary_metric,
+                "primary_metric": primary_metric,
                 "target_column": plan.target_column,
-                "suggested_models": plan.suggested_models,
+                "suggested_models": suggested_models,
             },
         }
 
