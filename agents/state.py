@@ -119,6 +119,7 @@ class AgentState(TypedDict, total=False):
     status: str  # "running" | "completed" | "failed"
     current_step: str  # Human-readable current agent name
     error: Optional[str]  # Set if any agent fails fatally
+    random_seed: int  # Seed for the holdout split, CV folds and model RNGs (default 42)
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
     # Must be a declared key: LangGraph drops any key a node returns that is not
