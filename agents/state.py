@@ -62,7 +62,8 @@ class FeatureEngineeringResult(TypedDict, total=False):
     new_features_created: list[str]
     dropped_columns: list[str]
     leakage_warnings: list[str]  # Any data leakage risks flagged
-    transformed_csv_path: str  # Path inside E2B sandbox
+    transformed_csv_path: str  # Local path of the processed CSV (never the raw input)
+    attempts: int  # Sandbox attempts used, including self-corrections
 
 
 class EvaluationResult(TypedDict, total=False):

@@ -140,6 +140,7 @@ def run_feature_engineer(state: AgentState) -> dict:
             csv_path=state["csv_path"],
             llm=llm,
             max_retries=3,
+            require_output=True,
         )
 
         if not result["success"]:
@@ -169,9 +170,9 @@ def run_feature_engineer(state: AgentState) -> dict:
             "new_features_created": created,
             "dropped_columns": dropped,
             "leakage_warnings": [],
-            "transformed_csv_path": result.get(
-                "output_csv_path", "/data/processed.csv"
-            ),
+            "transformed_csv_path": result["output_csv_path"],
+            # Sandbox attempts used, including self-corrections (1 = first try).
+            "attempts": result["attempts"],
         }
 
         return {

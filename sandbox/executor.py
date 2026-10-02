@@ -136,7 +136,10 @@ def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
             "stdout": stdout,
             "stderr": stderr,
             "error_text": error or stderr,
-            "output_csv_path": output_csv_path or csv_path,
+            # No fallback to the raw input: an empty path means "nothing was
+            # written", which execute_with_retry turns into a loud failure when
+            # the caller requires an output.
+            "output_csv_path": output_csv_path,
         }
     finally:
         sbx.kill()
@@ -194,6 +197,10 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
         f.write(code_with_path)
         script_path = f.name
 
+    # A stale output from an earlier attempt must not count as this attempt's.
+    if output_csv and Path(output_csv).exists():
+        os.unlink(output_csv)
+
     try:
         result = subprocess.run(
             # sys.executable, not "python": inside a venv, a container, or on a
@@ -210,8 +217,9 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             "stdout": result.stdout,
             "stderr": result.stderr,
             "error_text": result.stderr if not success else "",
+            # No silent fallback to the raw CSV (see execute_with_retry).
             "output_csv_path": (
-                output_csv if output_csv and Path(output_csv).exists() else csv_path
+                output_csv if output_csv and Path(output_csv).exists() else ""
             ),
         }
     except subprocess.TimeoutExpired:
@@ -220,7 +228,7 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             "stdout": "",
             "stderr": f"Subprocess timed out after {timeout}s",
             "error_text": f"Timeout after {timeout}s",
-            "output_csv_path": csv_path,
+            "output_csv_path": "",
         }
     finally:
         os.unlink(script_path)
@@ -235,6 +243,7 @@ def execute_with_retry(
     llm: Any,
     max_retries: int = 3,
     timeout: int | None = None,
+    require_output: bool = False,
 ) -> dict:
     """
     Execute code in a sandbox with self-correction on failure.
@@ -245,6 +254,11 @@ def execute_with_retry(
         llm:         LangChain LLM instance for self-correction.
         max_retries: Maximum number of correction attempts.
         timeout:     Execution timeout in seconds.
+        require_output: If True, a run that exits cleanly but writes no
+                     OUTPUT_CSV_PATH counts as a failure (and is fed to the
+                     self-correction loop). The feature engineer sets this:
+                     it used to fall back silently to the raw CSV, so a
+                     script that did nothing looked like a success.
 
     Returns:
         Dict with keys:
@@ -282,7 +296,18 @@ def execute_with_retry(
                 "stdout": "",
                 "stderr": str(exc),
                 "error_text": str(exc),
-                "output_csv_path": csv_path,
+                "output_csv_path": "",
+            }
+
+        if result["success"] and require_output and not result.get("output_csv_path"):
+            result = {
+                **result,
+                "success": False,
+                "error_text": (
+                    "The script exited without error but did not write its output "
+                    "CSV to OUTPUT_CSV_PATH. It must save the transformed DataFrame "
+                    "with df.to_csv(OUTPUT_CSV_PATH, index=False)."
+                ),
             }
 
         if result["success"]:
@@ -312,5 +337,5 @@ def execute_with_retry(
         "final_code": current_code,
         "attempts": max_retries,
         "last_error": last_error,
-        "output_csv_path": csv_path,
+        "output_csv_path": "",
     }

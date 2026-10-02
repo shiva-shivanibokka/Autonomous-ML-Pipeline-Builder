@@ -129,6 +129,10 @@ def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path
     # The evaluator ranked on the planned metric.
     ev = final["evaluation_result"]
     assert ev["primary_metric"] == "f1"
+    # The feature engineer's output, not the raw CSV, was what got trained on.
+    fr = final["feature_result"]
+    assert fr["transformed_csv_path"] and fr["transformed_csv_path"] != csv_path
+    assert "x1_minus_x2" in {c["name"] for c in final["feature_schema"]}
 
 
 def test_orchestrator_sees_the_dataset_columns(csv_path, tmp_path):
@@ -157,5 +161,28 @@ def test_orchestrator_rejects_a_target_that_is_not_a_column(csv_path, tmp_path):
             }
         )
     assert out.get("error") and "no_such_column" in out["error"]
+
+
+def test_feature_engineering_without_output_fails_loudly(tmp_path):
+    """A script that runs cleanly but writes nothing must not fall back to raw data."""
+    from unittest.mock import MagicMock
+
+    from sandbox.executor import execute_with_retry
+
+    csv = tmp_path / "d.csv"
+    pd.DataFrame({"a": [1, 2]}).to_csv(csv, index=False)
+    llm = MagicMock()
+    llm.invoke.return_value = MagicMock(content="print('still nothing')")
+    with patch("sandbox.executor.settings") as s:
+        s.execution_backend = "subprocess"
+        s.e2b_api_key = ""
+        s.allow_local_exec = True
+        s.sandbox_timeout_seconds = 30
+        res = execute_with_retry(
+            "print('no output written')", str(csv), llm, max_retries=2, require_output=True
+        )
+    assert res["success"] is False
+    assert res["output_csv_path"] == ""
+    assert "did not write its output" in res["last_error"]
 
 
