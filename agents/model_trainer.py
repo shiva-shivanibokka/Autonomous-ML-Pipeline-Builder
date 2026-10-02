@@ -229,17 +229,45 @@ def _compute_metrics(
     return metrics
 
 
+# sklearn scorer for each primary metric. CV is the model-selection signal, so
+# it must score the SAME metric the evaluator ranks on (it used to be
+# f1_weighted regardless of the plan, while selection used holdout AUC).
+# Neg-scorers keep "higher is better" for every metric.
+_CV_SCORERS = {
+    "f1": "f1_weighted",
+    "rmse": "neg_root_mean_squared_error",
+    "r2": "r2",
+    "mape": "neg_mean_absolute_percentage_error",
+}
+
+
+def cv_scorer_for(primary_metric: str, task_type: str, n_classes: int) -> str:
+    """Return the sklearn scoring string used to cross-validate `primary_metric`."""
+    if primary_metric == "auc":
+        return "roc_auc" if n_classes <= 2 else "roc_auc_ovr"
+    if primary_metric in _CV_SCORERS:
+        return _CV_SCORERS[primary_metric]
+    if task_type == "classification":
+        return "roc_auc" if n_classes <= 2 else "roc_auc_ovr"
+    return "neg_root_mean_squared_error"
+
+
 def _cross_validate(
-    pipe: Pipeline, X_train, y_train, task_type: str, seed: int = 42
+    pipe: Pipeline,
+    X_train,
+    y_train,
+    task_type: str,
+    primary_metric: str = "",
+    seed: int = 42,
 ) -> tuple[float, float, str]:
     """Leakage-free CV score (prep is re-fit inside each fold). Skips huge datasets."""
     if len(X_train) > _CV_ROW_CAP:
         return 0.0, 0.0, "skipped(n>cap)"
+    n_classes = len(np.unique(y_train)) if task_type == "classification" else 0
+    scorer = cv_scorer_for(primary_metric, task_type, n_classes)
     if task_type == "classification":
-        scorer = "f1_weighted"
         splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     else:
-        scorer = "r2"
         splitter = KFold(n_splits=5, shuffle=True, random_state=seed)
     try:
         scores = cross_val_score(pipe, X_train, y_train, cv=splitter, scoring=scorer, n_jobs=1)
@@ -259,6 +287,7 @@ async def _train_single_model(
     task_type: str,
     scale_pos: float,
     provider: str,
+    primary_metric: str = "",
     seed: int = 42,
 ) -> tuple[str, ModelResult]:
     """Train one model (prep+estimator Pipeline) asynchronously. Returns (name, ModelResult)."""
@@ -275,7 +304,9 @@ async def _train_single_model(
         pipe = Pipeline([("prep", clone(preprocessor)), ("model", estimator)])
 
         # Cross-validate BEFORE the final fit (prep re-fit inside every fold → no leakage).
-        cv_mean, cv_std, cv_metric = _cross_validate(pipe, X_train, y_train, task_type, seed=seed)
+        cv_mean, cv_std, cv_metric = _cross_validate(
+            pipe, X_train, y_train, task_type, primary_metric, seed
+        )
 
         pipe.fit(X_train, y_train)
 
@@ -370,6 +401,9 @@ def run_model_trainer(state: AgentState) -> dict:
         suggested_models = plan.get(
             "suggested_models", ["lightgbm", "xgboost", "random_forest"]
         )
+        primary_metric = plan.get(
+            "primary_metric", "auc" if task_type == "classification" else "rmse"
+        )
 
         logs.append(
             f"[{timestamp}] MODEL TRAINER — Training {len(suggested_models)} models in parallel: {suggested_models}"
@@ -439,6 +473,7 @@ def run_model_trainer(state: AgentState) -> dict:
                     task_type=task_type,
                     scale_pos=scale_pos,
                     provider=state["provider"],
+                    primary_metric=primary_metric,
                     seed=seed,
                 )
                 for m in suggested_models

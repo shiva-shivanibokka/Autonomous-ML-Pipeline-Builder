@@ -72,7 +72,7 @@ def test_trainer_produces_fitted_pipelines_with_cv(tmp_path):
         assert isinstance(r["model_object"], Pipeline)
         assert "prep" in r["model_object"].named_steps
         # Cross-validation actually ran (leakage-free).
-        assert r["cv_metric"] == "f1_weighted"
+        assert r["cv_metric"] == "roc_auc"  # CV scores the planned primary metric
         assert 0.0 <= r["cv_mean"] <= 1.0
     # Raw input schema captured for inference, and a held-out SHAP sample exists.
     assert {c["name"] for c in out["feature_schema"]} == {"id", "x1", "x2", "cat"}

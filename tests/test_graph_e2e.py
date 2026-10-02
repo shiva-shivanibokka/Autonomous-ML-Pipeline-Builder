@@ -126,9 +126,13 @@ def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path
     assert final["orchestrator_plan"]["suggested_models"] == ["logistic_regression", "mlp"]
     # The trainer trained the PLANNED models, not its defaults.
     assert set(final["model_results"]) == {"logistic_regression", "mlp"}
-    # The evaluator ranked on the planned metric.
+    # CV scored the planned metric (f1 -> f1_weighted), not a hard-coded one.
+    for r in final["model_results"].values():
+        assert r["cv_metric"] == "f1_weighted"
+    # The evaluator ranked on the planned metric, on CV.
     ev = final["evaluation_result"]
     assert ev["primary_metric"] == "f1"
+    assert ev["selection_basis"] == "cv"
     # The feature engineer's output, not the raw CSV, was what got trained on.
     fr = final["feature_result"]
     assert fr["transformed_csv_path"] and fr["transformed_csv_path"] != csv_path
@@ -202,3 +206,15 @@ def test_generated_code_does_not_see_api_keys(tmp_path):
     assert str(tmp_path) not in res["stdout"]
 
 
+def test_selection_uses_cv_not_holdout():
+    from agents.evaluator import _select_winner
+
+    results = {
+        # Best on the held-out test set, worse on CV: must NOT win.
+        "a": {"metrics": {"auc": 0.99}, "cv_mean": 0.70, "cv_metric": "roc_auc",
+              "model_object": object(), "error": None},
+        "b": {"metrics": {"auc": 0.80}, "cv_mean": 0.85, "cv_metric": "roc_auc",
+              "model_object": object(), "error": None},
+    }
+    winner, ranking = _select_winner(results, "auc")
+    assert winner == "b" and ranking == ["b", "a"]

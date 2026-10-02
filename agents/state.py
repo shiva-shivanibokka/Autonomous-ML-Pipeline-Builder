@@ -73,6 +73,7 @@ class EvaluationResult(TypedDict, total=False):
     ranking: list[str]  # model names ordered best → worst
     justification: str
     primary_metric: str  # The metric used to pick the winner
+    selection_basis: str  # "cv" (CV on the training split) or "holdout" (row-cap fallback)
     shap_plot_path: str
     bias_warnings: list[str]
     comparison_table: list[dict[str, Any]]
