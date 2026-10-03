@@ -25,9 +25,11 @@ from scipy.stats import rankdata, wilcoxon
 HERE = Path(__file__).resolve().parent
 RES = HERE / "results"
 ARMS = ["logreg", "lgbm", "xgb", "flaml11", "flaml", "sys_fixed", "sys_llm"]
-PAIRS = [("sys_llm", "sys_fixed"), ("sys_llm", "flaml"), ("sys_fixed", "flaml"), ("sys_fixed", "flaml11"),
-         ("sys_llm", "lgbm"), ("sys_fixed", "lgbm"), ("sys_fixed", "xgb"),
-         ("sys_fixed", "logreg"), ("flaml", "lgbm"), ("sys_llm", "logreg")]
+# Two pre-declared families; Holm is applied within each family and failure mode.
+LLM_PAIRS = [("sys_llm", "sys_fixed"), ("sys_llm", "flaml11"), ("sys_llm", "flaml")]
+NONLLM_PAIRS = [("sys_fixed", "flaml"), ("sys_fixed", "flaml11"), ("sys_fixed", "lgbm"),
+                ("sys_fixed", "xgb"), ("sys_fixed", "logreg"), ("flaml", "lgbm")]
+PAIRS = LLM_PAIRS + NONLLM_PAIRS
 
 
 def boot_ci(d, n=10000, seed=0):
@@ -55,6 +57,9 @@ def main():
         auc[(r["arm"], r["openml_id"])][r["seed"]] = r["auc"] if r.get("ok") else None
 
     def ds_mean(arm, ds, impute):
+        """impute: False = failures excluded (None if any seed failed); True / "const" =
+        a failed run scores 0.5; "fixed" = a failed run falls back to sys_fixed's AUC
+        on the same dataset and seed (what a user gets by rerunning without the LLM)."""
         vals = auc.get((arm, ds), {})
         xs = []
         for s in seeds:
@@ -62,7 +67,9 @@ def main():
             if v is None:
                 if not impute:
                     return None
-                v = 0.5
+                v = auc.get(("sys_fixed", ds), {}).get(s) if impute == "fixed" else 0.5
+                if v is None:
+                    return None
             xs.append(v)
         return float(np.mean(xs)) if xs else None
 
@@ -85,6 +92,12 @@ def main():
     M = np.array([[ds_mean(a, ds, True) for a in arms] for ds in dsets], float)
     ranks = np.vstack([rankdata(-row) for row in M])
     summary["avg_rank_imputed"] = {a: float(ranks[:, i].mean()) for i, a in enumerate(arms)}
+    MF = np.array([[ds_mean(a, ds, "fixed") if a == "sys_llm" else ds_mean(a, ds, True) for a in arms] for ds in dsets], float)
+    summary["mean_auc_fallback_fixed"] = {a: float(MF[:, i].mean()) for i, a in enumerate(arms)}
+    ok_ds = [ds for ds in dsets if all(ds_mean(a, ds, False) is not None for a in arms)]
+    summary["datasets_all_arms_completed"] = ok_ds
+    summary["mean_auc_failures_excluded"] = {
+        a: float(np.mean([ds_mean(a, ds, False) for ds in ok_ds])) if ok_ds else None for a in arms}
     summary["mean_auc_imputed"] = {a: float(M[:, i].mean()) for i, a in enumerate(arms)}
 
     # Pairwise tests.
@@ -92,8 +105,9 @@ def main():
     for a, b in PAIRS:
         if a not in arms or b not in arms:
             continue
-        for mode in ("completed", "imputed"):
-            imp = mode == "imputed"
+        modes = ("completed", "imputed", "fallback_fixed") if a == "sys_llm" else ("completed", "imputed")
+        for mode in modes:
+            imp = {"completed": False, "imputed": True, "fallback_fixed": "fixed"}[mode]
             pairs = [(ds_mean(a, ds, imp), ds_mean(b, ds, imp)) for ds in dsets]
             pairs = [(x, y) for x, y in pairs if x is not None and y is not None]
             if len(pairs) < 2:
@@ -104,16 +118,19 @@ def main():
             except ValueError:
                 p = float("nan")
             lo, hi = boot_ci(d)
-            tests.append({"a": a, "b": b, "mode": mode, "n_datasets": len(d),
+            tests.append({"a": a, "b": b, "mode": mode, "family": "llm" if (a, b) in LLM_PAIRS else "non_llm",
+                          "n_datasets": len(d),
                           "mean_diff": float(d.mean()), "median_diff": float(np.median(d)),
                           "ci95": [lo, hi], "wins": int((d > 0).sum()), "losses": int((d < 0).sum()),
                           "ties": int((d == 0).sum()), "wilcoxon_p": p})
-    # Holm-Bonferroni over the "completed" family of comparisons actually run.
-    fam = sorted([t for t in tests if t["mode"] == "completed"], key=lambda t: t["wilcoxon_p"])
-    m, run_max = len(fam), 0.0
-    for i, t in enumerate(fam):
-        run_max = max(run_max, min(1.0, (m - i) * t["wilcoxon_p"]))
-        t["holm_p"] = run_max
+    # Holm-Bonferroni within each (family, failure mode).
+    for key in {(t["family"], t["mode"]) for t in tests}:
+        fam = sorted([t for t in tests if (t["family"], t["mode"]) == key and t["wilcoxon_p"] == t["wilcoxon_p"]],
+                     key=lambda t: t["wilcoxon_p"])
+        m, run_max = len(fam), 0.0
+        for i, t in enumerate(fam):
+            run_max = max(run_max, min(1.0, (m - i) * t["wilcoxon_p"]))
+            t["holm_p"] = run_max
     for t in tests:
         t.setdefault("holm_p", None)
     summary["paired_tests"] = tests
@@ -139,7 +156,7 @@ def main():
             "llm_calls_total": int(sum(r.get("llm_calls", 0) for r in llm)),
             "llm_seconds_total": float(sum(r.get("llm_seconds", 0) for r in llm)),
             "planned_metric": dict(Counter((r.get("plan") or {}).get("primary_metric") for r in s0)),
-            "planned_models": dict(Counter(tuple((r.get("plan") or {}).get("suggested_models") or []) for r in s0)),
+            "planned_models": dict(Counter(",".join((r.get("plan") or {}).get("suggested_models") or []) for r in s0)),
             "winner": dict(Counter(r.get("winner") for r in llm if r.get("ok"))),
             "fe_attempts_per_dataset": [len(a) for a in attempts],
             "fe_first_try_success": sum(1 for a in attempts if a and a[0]["returncode_ok"] and a[0]["wrote_output"]),
@@ -173,9 +190,15 @@ def main():
                 cells.append(f"{c['mean']:.3f}{sd}{fl}")
         L.append(f"| {row['dataset']} ({row['openml_id']}) | " + " | ".join(cells) + " |")
     L.append("| **mean AUC (fail = 0.5)** | " + " | ".join(f"{summary['mean_auc_imputed'][a]:.4f}" for a in arms) + " |")
+    L.append("| **mean AUC, sys_llm failures -> sys_fixed fallback** | " + " | ".join(f"{summary['mean_auc_fallback_fixed'][a]:.4f}" for a in arms) + " |")
+    L.append(f"| **mean AUC, failures excluded ({len(ok_ds)} datasets where every arm completed every seed)** | "
+             + " | ".join(f"{summary['mean_auc_failures_excluded'][a]:.4f}" if ok_ds else "-" for a in arms) + " |")
     L.append("| **average rank (1 = best)** | " + " | ".join(f"{summary['avg_rank_imputed'][a]:.2f}" for a in arms) + " |")
     L.append("| failed runs | " + " | ".join(f"{per_arm[a]['failed']}/{per_arm[a]['runs']}" for a in arms) + " |")
     L.append("| median wall time per run (s) | " + " | ".join(f"{per_arm[a]['wall_median_s']:.1f}" for a in arms) + " |")
+    L.append("")
+    L.append("Failure modes: completed = datasets where both arms completed every seed; imputed = failed run scores 0.5; "
+             "fallback_fixed = failed sys_llm run takes sys_fixed's score. Holm is within family (llm / non_llm) and mode.")
     L.append("")
     L.append("| comparison | failures | n datasets | mean ΔAUC | 95% bootstrap CI | W/L/T | Wilcoxon p | Holm p |")
     L.append("|---|---|---|---|---|---|---|---|")

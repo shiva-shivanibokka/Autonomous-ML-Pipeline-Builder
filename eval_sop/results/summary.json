@@ -11,7 +11,8 @@
     "xgb",
     "flaml11",
     "flaml",
-    "sys_fixed"
+    "sys_fixed",
+    "sys_llm"
   ],
   "per_dataset": [
     {
@@ -52,6 +53,12 @@
         "std": 0.00010041879847069229,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -90,6 +97,12 @@
       "sys_fixed": {
         "mean": 0.9885265700483092,
         "std": 0.006892147786028695,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9854317632850242,
+        "std": 0.01152520774475783,
         "n_ok": 3,
         "n_fail": 0
       }
@@ -132,6 +145,12 @@
         "std": 0.030093058746298987,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -172,6 +191,12 @@
         "std": 0.02237529929621866,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -210,6 +235,12 @@
       "sys_fixed": {
         "mean": 0.7929365079365079,
         "std": 0.06997188588865402,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.7937301587301588,
+        "std": 0.06383998177368704,
         "n_ok": 3,
         "n_fail": 0
       }
@@ -252,6 +283,12 @@
         "std": 0.03324112761561723,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -292,6 +329,12 @@
         "std": 0.004497353911621366,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -330,6 +373,12 @@
       "sys_fixed": {
         "mean": 0.9139472279457094,
         "std": 0.011056471908834012,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9137125582634722,
+        "std": 0.010523791716455176,
         "n_ok": 3,
         "n_fail": 0
       }
@@ -372,6 +421,12 @@
         "std": 0.004638197781006676,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -410,6 +465,12 @@
       "sys_fixed": {
         "mean": 0.7243339831059129,
         "std": 0.05093952580872189,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.6632959714100064,
+        "std": 0.08302142995622369,
         "n_ok": 3,
         "n_fail": 0
       }
@@ -452,6 +513,12 @@
         "std": 0.05458656412490921,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -492,6 +559,12 @@
         "std": 0.01379419593000285,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -532,6 +605,12 @@
         "std": 0.005356054062282302,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
       }
     },
     {
@@ -570,6 +649,12 @@
       "sys_fixed": {
         "mean": 0.9645846777645494,
         "std": 0.008418797879656336,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9640147614959477,
+        "std": 0.008216904621420556,
         "n_ok": 3,
         "n_fail": 0
       }
@@ -612,16 +697,49 @@
         "std": 0.008498179342761378,
         "n_ok": 3,
         "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9652076318742986,
+        "std": 0.01698400218902532,
+        "n_ok": 3,
+        "n_fail": 0
       }
     }
   ],
   "avg_rank_imputed": {
-    "logreg": 3.0,
-    "lgbm": 4.2,
-    "xgb": 4.266666666666667,
-    "flaml11": 3.7666666666666666,
-    "flaml": 2.9,
-    "sys_fixed": 2.8666666666666667
+    "logreg": 3.1333333333333333,
+    "lgbm": 4.4,
+    "xgb": 4.4,
+    "flaml11": 3.9,
+    "flaml": 3.033333333333333,
+    "sys_fixed": 2.933333333333333,
+    "sys_llm": 6.2
+  },
+  "mean_auc_fallback_fixed": {
+    "logreg": 0.8842652849809792,
+    "lgbm": 0.877344358433844,
+    "xgb": 0.87566800667525,
+    "flaml11": 0.8807040957049797,
+    "flaml": 0.8849442733178797,
+    "sys_fixed": 0.8875084618122131,
+    "sys_llm": 0.8829079816172615
+  },
+  "datasets_all_arms_completed": [
+    15,
+    31,
+    188,
+    1464,
+    40982,
+    40994
+  ],
+  "mean_auc_failures_excluded": {
+    "logreg": 0.8917729258848768,
+    "lgbm": 0.8866725461291306,
+    "xgb": 0.8872536824304696,
+    "flaml11": 0.8850206469043678,
+    "flaml": 0.8877363394378102,
+    "sys_fixed": 0.8924000079971969,
+    "sys_llm": 0.880898807509818
   },
   "mean_auc_imputed": {
     "logreg": 0.8842652849809792,
@@ -629,13 +747,177 @@
     "xgb": 0.87566800667525,
     "flaml11": 0.8807040957049797,
     "flaml": 0.8849442733178797,
-    "sys_fixed": 0.8875084618122131
+    "sys_fixed": 0.8875084618122131,
+    "sys_llm": 0.6523595230039272
   },
   "paired_tests": [
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.011501200487378868,
+      "median_diff": -0.0018323615159433482,
+      "ci95": [
+        -0.03151955282213611,
+        -0.00042446013484320755
+      ],
+      "wins": 1,
+      "losses": 5,
+      "ties": 0,
+      "wilcoxon_p": 0.15625,
+      "holm_p": 0.46875
+    },
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.23514893880828583,
+      "median_diff": -0.2585636664304275,
+      "ci95": [
+        -0.3333054283871189,
+        -0.1365314117198618
+      ],
+      "wins": 1,
+      "losses": 14,
+      "ties": 0,
+      "wilcoxon_p": 0.00030517578125,
+      "holm_p": 0.00091552734375
+    },
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.004600480194951547,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.01297586777587809,
+        -4.7590292155486046e-05
+      ],
+      "wins": 1,
+      "losses": 5,
+      "ties": 9,
+      "wilcoxon_p": 0.11585149752593006,
+      "holm_p": 0.3475544925777902
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.004121839394549798,
+      "median_diff": -0.0037017698778194497,
+      "ci95": [
+        -0.019394335878311592,
+        0.010739263385624273
+      ],
+      "wins": 2,
+      "losses": 4,
+      "ties": 0,
+      "wilcoxon_p": 0.5625,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.22834457270105257,
+      "median_diff": -0.2458418972069878,
+      "ci95": [
+        -0.3272987577434036,
+        -0.12871736027010502
+      ],
+      "wins": 2,
+      "losses": 13,
+      "ties": 0,
+      "wilcoxon_p": 0.00115966796875,
+      "holm_p": 0.0023193359375
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": 0.002203885912281704,
+      "median_diff": 0.00013045803817191004,
+      "ci95": [
+        -0.005599968066477306,
+        0.009602576664478385
+      ],
+      "wins": 8,
+      "losses": 7,
+      "ties": 0,
+      "wilcoxon_p": 0.5994873046875,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.006837531927992191,
+      "median_diff": -0.003154517462360451,
+      "ci95": [
+        -0.023228311782889848,
+        0.007883263451492503
+      ],
+      "wins": 2,
+      "losses": 4,
+      "ties": 0,
+      "wilcoxon_p": 0.5625,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.2325847503139525,
+      "median_diff": -0.24128510147549775,
+      "ci95": [
+        -0.33258484293097174,
+        -0.13206562840497174
+      ],
+      "wins": 2,
+      "losses": 13,
+      "ties": 0,
+      "wilcoxon_p": 0.00115966796875,
+      "holm_p": 0.0023193359375
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.0020362917006182535,
+      "median_diff": -0.001307847082494984,
+      "ci95": [
+        -0.010090670393539773,
+        0.005645291335434676
+      ],
+      "wins": 6,
+      "losses": 9,
+      "ties": 0,
+      "wilcoxon_p": 0.52447509765625,
+      "holm_p": 1.0
+    },
     {
       "a": "sys_fixed",
       "b": "flaml",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.0025641884943332933,
       "median_diff": -0.0004886164502133639,
@@ -653,6 +935,7 @@
       "a": "sys_fixed",
       "b": "flaml",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.0025641884943332933,
       "median_diff": -0.0004886164502133639,
@@ -664,12 +947,13 @@
       "losses": 8,
       "ties": 0,
       "wilcoxon_p": 0.76153564453125,
-      "holm_p": null
+      "holm_p": 1.0
     },
     {
       "a": "sys_fixed",
       "b": "flaml11",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.006804366107233251,
       "median_diff": 0.004435455255127341,
@@ -687,6 +971,7 @@
       "a": "sys_fixed",
       "b": "flaml11",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.006804366107233251,
       "median_diff": 0.004435455255127341,
@@ -698,12 +983,13 @@
       "losses": 6,
       "ties": 0,
       "wilcoxon_p": 0.10699462890625,
-      "holm_p": null
+      "holm_p": 0.427978515625
     },
     {
       "a": "sys_fixed",
       "b": "lgbm",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.010164103378369031,
       "median_diff": 0.008928571428571397,
@@ -721,6 +1007,7 @@
       "a": "sys_fixed",
       "b": "lgbm",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.010164103378369031,
       "median_diff": 0.008928571428571397,
@@ -732,12 +1019,13 @@
       "losses": 3,
       "ties": 0,
       "wilcoxon_p": 0.0067138671875,
-      "holm_p": null
+      "holm_p": 0.040283203125
     },
     {
       "a": "sys_fixed",
       "b": "xgb",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.011840455136962835,
       "median_diff": 0.0031787098210034337,
@@ -755,6 +1043,7 @@
       "a": "sys_fixed",
       "b": "xgb",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.011840455136962835,
       "median_diff": 0.0031787098210034337,
@@ -766,12 +1055,13 @@
       "losses": 3,
       "ties": 0,
       "wilcoxon_p": 0.012451171875,
-      "holm_p": null
+      "holm_p": 0.062255859375
     },
     {
       "a": "sys_fixed",
       "b": "logreg",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.0032431768312338517,
       "median_diff": -0.0016049382716051275,
@@ -789,6 +1079,7 @@
       "a": "sys_fixed",
       "b": "logreg",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.0032431768312338517,
       "median_diff": -0.0016049382716051275,
@@ -800,12 +1091,13 @@
       "losses": 8,
       "ties": 0,
       "wilcoxon_p": 0.803955078125,
-      "holm_p": null
+      "holm_p": 1.0
     },
     {
       "a": "flaml",
       "b": "lgbm",
       "mode": "completed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.007599914884035737,
       "median_diff": 0.0024250440917109595,
@@ -823,6 +1115,7 @@
       "a": "flaml",
       "b": "lgbm",
       "mode": "imputed",
+      "family": "non_llm",
       "n_datasets": 15,
       "mean_diff": 0.007599914884035737,
       "median_diff": 0.0024250440917109595,
@@ -834,7 +1127,7 @@
       "losses": 6,
       "ties": 0,
       "wilcoxon_p": 0.22930908203125,
-      "holm_p": null
+      "holm_p": 0.68792724609375
     }
   ],
   "per_arm": {
@@ -885,7 +1178,77 @@
       "wall_mean_s": 12.140444444444446,
       "wall_total_s": 546.32,
       "errors": []
+    },
+    "sys_llm": {
+      "runs": 45,
+      "failed": 27,
+      "wall_median_s": 9.15,
+      "wall_mean_s": 33.47288888888889,
+      "wall_total_s": 1506.28,
+      "errors": [
+        [
+          "Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: Tracebac",
+          15
+        ],
+        [
+          "Evaluator failed: No model trained successfully; cannot evaluate.",
+          9
+        ],
+        [
+          "Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: Timeout ",
+          3
+        ]
+      ]
     }
+  },
+  "llm": {
+    "model": {
+      "planner": "qwen2.5:7b",
+      "codegen": "qwen2.5:7b",
+      "base_url": "http://localhost:11434/v1",
+      "num_ctx": 8192
+    },
+    "llm_calls_total": 61,
+    "llm_seconds_total": 567.42,
+    "planned_metric": {
+      "auc": 15
+    },
+    "planned_models": {
+      "lightgbm,xgboost,random_forest,mlp": 14,
+      "lightgbm,xgboost,random_forest,mlp,logistic_regression": 1
+    },
+    "winner": {
+      "random_forest": 6,
+      "mlp": 4,
+      "xgboost": 6,
+      "lightgbm": 2
+    },
+    "fe_attempts_per_dataset": [
+      2,
+      3,
+      1,
+      3,
+      3,
+      3,
+      1,
+      2,
+      2,
+      3,
+      1,
+      1,
+      3,
+      2,
+      1
+    ],
+    "fe_first_try_success": 5,
+    "fe_exit0_but_no_output_attempts": 4,
+    "fe_datasets_with_exit0_no_output": 4,
+    "fe_failed_datasets": 6,
+    "orchestrator_failed": 0,
+    "same_split_as_baselines": {
+      "true": 18
+    },
+    "datasets_with_seed0_record": 15
   },
   "sys_fixed_winner": {
     "random_forest": 26,

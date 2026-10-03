@@ -47,7 +47,7 @@ class CachedChat:
 
     def __init__(self, model: str, temperature: float, max_tokens: int, cache_path: Path,
                  role: str, stats: dict[str, Any], base_url: str = DEFAULT_BASE_URL,
-                 api_key: str = ""):
+                 api_key: str = "", num_ctx: int | None = None):
         self.model = model
         self.temperature = temperature
         self.max_tokens = max_tokens
@@ -55,6 +55,9 @@ class CachedChat:
         self.role = role
         self.stats = stats
         self.base_url = base_url
+        # num_ctx: talk to Ollama's native /api/chat so the context window can be
+        # capped (its OpenAI-compatible endpoint has no context option).
+        self.num_ctx = num_ctx
         self._client = OpenAI(api_key=api_key or "not-needed", base_url=base_url,
                               timeout=1800, max_retries=0)
         self._cache = self._load()
@@ -94,6 +97,9 @@ class CachedChat:
                 return _Resp(self._cache[key])
         t0 = time.time()
         r = None
+        if self.num_ctx:
+            text, usage = self._ollama_native(msgs)
+            return self._record(key, msgs, text, usage, t0)
         for attempt in range(8):  # free tiers rate-limit (HTTP 429): back off and retry
             try:
                 r = self._client.chat.completions.create(
@@ -110,6 +116,27 @@ class CachedChat:
         if r is None:
             raise RuntimeError("LLM endpoint kept rate-limiting; giving up on this call")
         text = r.choices[0].message.content or ""
+        return self._record(key, msgs, text, r.usage.model_dump() if r.usage else None, t0)
+
+    def _ollama_native(self, msgs):
+        import urllib.request
+
+        root = self.base_url.rstrip("/")
+        root = root[: -len("/v1")] if root.endswith("/v1") else root
+        # Generation is capped at half the context so prompt + output fit in num_ctx.
+        body = {"model": self.model, "messages": msgs, "stream": False,
+                "options": {"temperature": self.temperature, "seed": 0, "num_ctx": self.num_ctx,
+                            "num_predict": min(self.max_tokens, self.num_ctx // 2)}}
+        req = urllib.request.Request(root + "/api/chat", data=json.dumps(body).encode("utf-8"),
+                                     headers={"Content-Type": "application/json"})
+        with urllib.request.urlopen(req, timeout=3600) as resp:
+            out = json.loads(resp.read().decode("utf-8"))
+        usage = {"prompt_tokens": out.get("prompt_eval_count"), "completion_tokens": out.get("eval_count"),
+                 "num_ctx": self.num_ctx, "num_predict": body["options"]["num_predict"],
+                 "done_reason": out.get("done_reason")}
+        return out["message"]["content"] or "", usage
+
+    def _record(self, key, msgs, text, usage, t0):
         dt = time.time() - t0
         self.stats["llm_calls"] = self.stats.get("llm_calls", 0) + 1
         self.stats["llm_seconds"] = self.stats.get("llm_seconds", 0.0) + dt
@@ -123,7 +150,7 @@ class CachedChat:
             "messages": msgs,
             "response": text,
             "latency_s": round(dt, 2),
-            "usage": r.usage.model_dump() if r.usage else None,
+            "usage": usage,
             "ts": time.strftime("%Y-%m-%dT%H:%M:%S"),
         }
         with self._lock:

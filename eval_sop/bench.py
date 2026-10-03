@@ -307,6 +307,8 @@ def main():
     ap.add_argument("--llm-key-file", default=None,
                     help="dotenv file to read the API key from, in-process (never printed or exported)")
     ap.add_argument("--llm-key-name", default=None, help="variable name inside --llm-key-file")
+    ap.add_argument("--ollama-num-ctx", type=int, default=None,
+                    help="use Ollama's native /api/chat with this context window (e.g. 8192)")
     ap.add_argument("--out", default=str(RESULTS / "runs.jsonl"))
     ap.add_argument("--skip-done", action="store_true")
     ap.add_argument("--cache", default=str(RESULTS / "llm_cache.jsonl"))
@@ -331,9 +333,10 @@ def main():
         from dotenv import dotenv_values
 
         key = dotenv_values(args.llm_key_file).get(args.llm_key_name) or ""
-    planner = CachedChat(args.llm, 0.0, 4096, cache, "planner", stats, args.llm_base_url, key)
+    planner = CachedChat(args.llm, 0.0, 4096, cache, "planner", stats, args.llm_base_url, key,
+                         args.ollama_num_ctx)
     codegen = CachedChat(args.codegen_model or args.llm, 0.1, 8192, cache, "codegen", stats,
-                         args.llm_base_url, key)
+                         args.llm_base_url, key, args.ollama_num_ctx)
     del key
 
     done = set()
@@ -383,7 +386,8 @@ def main():
                 rec["llm_seconds"] = round(stats.get("llm_seconds", 0) - before.get("llm_seconds", 0), 2)
                 rec["llm_model"] = (
                     {"planner": args.llm, "codegen": args.codegen_model or args.llm,
-                     "base_url": args.llm_base_url} if arm == "sys_llm" else None)
+                     "base_url": args.llm_base_url, "num_ctx": args.ollama_num_ctx}
+                    if arm == "sys_llm" else None)
                 rec["versions"] = versions
                 with out.open("a", encoding="utf-8") as f:
                     f.write(json.dumps(rec, default=str) + "\n")
