@@ -5,12 +5,24 @@ fixes, the mocked-LLM end-to-end test, all non-LLM arms, the LLM arm (local
 `qwen2.5:7b`, 15 datasets × 3 seeds) and the leakage audit.
 
 **Headline:**
-- With a 7B local model, the full agent pipeline **failed on 27 of 45 runs**
-  (9 of 15 datasets, every seed).
+- With a 7B local model, the full agent pipeline **failed on 9 of 15 datasets**
+  (on every seed of each; seeds 1–2 replay seed 0's LLM outputs, so 15 — not
+  45 — LLM outcomes are independent).
 - On the 6 datasets where it completed, it was not better than the same
   pipeline with the LLM steps removed: Δ = −0.012 AUC, Holm p = 0.47.
 - None of the 9 generated feature-engineering scripts that ran was flagged for
   leakage. Positive controls show the audit detects leakage when it is present.
+- The LLM-free pipeline's +0.010 AUC win over default LightGBM on the main 15
+  datasets did **not** replicate on 15 further CC18 datasets (+0.003, Holm
+  p = 0.41; section 2c).
+
+**Review fixes (after an adversarial review):** a relative-path regression
+introduced by commit `1ff217b` was fixed (`ba17f4a`); generated code now only
+sees paths inside its throwaway directory (`30276d0`); one failed CV run no
+longer sends selection to the test set (`6593f43`). Claims below were narrowed
+accordingly. The benchmark numbers were produced before these three commits;
+none of them changes a benchmark run (the harness passes absolute paths, and
+63/63 completed system runs already selected on CV).
 
 Base commit: `8987d6f` (main). All work is on `sop-eval`. Nothing was pushed.
 
@@ -20,7 +32,20 @@ Base commit: `8987d6f` (main). All work is on `sop-eval`. Nothing was pushed.
 
 **Datasets.** 15 classification datasets from the OpenML-CC18 suite (suite 99),
 540–3,196 rows, 4–41 features, 2–7 classes. Five have categorical features and
-three have missing values. The OpenML default target is used. IDs, versions and
+three have missing values.
+
+*Selection rule (stated after the fact):* hand-picked from the 42 CC18 datasets
+with 500–3,200 rows, aiming for a mix of binary/multiclass and of
+categorical/missing-value datasets, avoiding very wide (>60 features) or
+many-class (>7) ones. This **cannot be verified as pre-registered**:
+`datasets.json` was committed in the same commit as the results (`5046138`).
+The 27 CC18 datasets that pass the row filter but were not used are:
+dresses-sales, kc2, cylinder-bands, balance-scale, analcatdata_dmft,
+analcatdata_authorship, tic-tac-toe, vowel, MiceProtein, cnae-9, pc1,
+banknote-authentication, pc4, pc3, semeion, car, mfeat-morphological,
+mfeat-zernike, mfeat-factors, mfeat-karhunen, mfeat-fourier, mfeat-pixel,
+segment, ozone-level-8hr, madelon, dna, splice. The 15 of these with ≤60
+features were used as a robustness set (section 2c). The OpenML default target is used. IDs, versions and
 shapes are in `eval_sop/datasets.json`. Fetch them with
 `python eval_sop/fetch_datasets.py` (the CSVs are git-ignored).
 
@@ -58,7 +83,7 @@ the raw records.
 | `xgb` | XGBoost with library defaults, same preprocessor |
 | `flaml11` | FLAML AutoML, `time_budget=11 s`, metric `roc_auc`/`roc_auc_ovr`. The budget matches the median wall time of `sys_fixed` (11.1 s). |
 | `flaml` | FLAML AutoML, `time_budget=60 s` (about 5x the system's median time) |
-| `sys_fixed` | **This system with every LLM step removed.** It runs the real `run_model_trainer` and `run_evaluator` nodes with the fixed plan the trainer uses by default (lightgbm, xgboost, random_forest; primary metric AUC). There is no generated feature engineering; the input is the raw CSV. The winner is chosen on 5-fold CV AUC on the training split. |
+| `sys_fixed` | **This system with every LLM step removed.** It runs the real `run_model_trainer` and `run_evaluator` nodes with the fixed plan the trainer uses by default (lightgbm, xgboost, random_forest; primary metric AUC). There is no generated feature engineering; the input is the raw CSV. The three candidates have the project's **hand-set** hyperparameters (GBMs: 300 trees, lr 0.05, depth 6, subsampling; RF: 200 trees, depth 10, min_samples_leaf 5) — nothing is tuned — and binary tasks get imbalance weighting (`scale_pos_weight` = majority/minority for the GBMs, `class_weight="balanced"` for RF). The winner is chosen on 5-fold CV AUC on the training split. The trainer fits the 3 candidates **in parallel threads**. |
 | `sys_llm` | **The full agent graph with a real LLM**: orchestrator → data analyst → feature engineer (LLM-written script, run in a stripped-env throwaway dir, up to 3 self-correction attempts) → trainer → evaluator. LLM: `qwen2.5:7b` (Ollama tag, digest `845dbda0ea48`, Q4_K_M) for both planner and codegen, through the local Ollama 0.34.4 server at `:11434`, one request at a time. Settings: native `/api/chat`, `num_ctx=8192`, planner temperature 0, codegen temperature 0.1, `seed=0`, `num_predict ≤ 4096`. |
 
 In the system arms, MLflow logging, SHAP plotting and the evaluator's
@@ -71,8 +96,11 @@ with `--system-site-packages` that adds FLAML and openml. Versions: sklearn
 1.8.0, lightgbm 4.6.0, xgboost 3.2.0, flaml 2.3.6, pandas 2.3.3, numpy 2.5.3,
 langgraph 1.1.6. These are newer than `requirements.txt` pins; the repo had no
 `.venv` to reuse. Thread caps: `OMP_NUM_THREADS = OPENBLAS = MKL =
-LOKY_MAX_CPU_COUNT = 1`, FLAML `n_jobs=1`. The machine was shared, and with
-all-cores defaults one LightGBM fit took 339 s.
+LOKY_MAX_CPU_COUNT = 1`, FLAML `n_jobs=1`. These cap threads *per library
+call*; `sys_fixed`/`sys_llm` still train their 3–5 candidates concurrently in
+separate threads, so they use up to ~3 cores while FLAML and the single-model
+baselines use 1. The machine was shared, and with all-cores defaults one
+LightGBM fit took 339 s.
 
 **Reproduce:**
 ```bash
@@ -86,12 +114,19 @@ python -m eval_sop.leakage_audit            # -> results/leakage_audit.json
 python -m eval_sop.leakage_audit_controls   # -> results/leakage_audit_controls.json
 python -m eval_sop.analyze      # -> eval_sop/results/summary.{md,json}
 python eval_sop/repro/repro_bugs.py <code root>   # bug reproductions
+# robustness set (section 2c)
+python eval_sop/fetch_datasets.py --robustness
+python -m eval_sop.bench --datasets-meta datasets_robustness.json --arms logreg lgbm xgb sys_fixed --seeds 0 1 2 --out eval_sop/results/robustness/runs_simple_fixed.jsonl
+python -m eval_sop.bench --datasets-meta datasets_robustness.json --arms flaml --flaml-budget 11 --flaml-arm-name flaml11 --seeds 0 1 2 --out eval_sop/results/robustness/runs_flaml11.jsonl
+python -m eval_sop.analyze eval_sop/results/robustness
 ```
 Raw per-run records (one JSON object per arm × dataset × seed, including the
 CV scores of every candidate, the winner, wall time and versions) are in
 `eval_sop/results/runs_*.jsonl`. Every LLM prompt and response (61 calls) is in
 `eval_sop/results/llm_cache.jsonl`. Re-running the `sys_llm` command with that
-file in place replays the LLM arm with no LLM calls.
+file in place replays the LLM arm with no LLM calls, except the few
+self-correction prompts that quoted a local path: those paths were scrubbed
+from the committed cache (`e8e348b`), so they no longer hash-match.
 
 **Determinism check.** The `logreg`/`lgbm`/`sys_fixed` arms were first run
 across two days with a kill in between
@@ -124,7 +159,7 @@ Cells show the per-dataset mean ± std over the 3 seeds of test ROC AUC.
 | steel-plates-fault (40982) | 0.930 ± 0.003 | 0.964 ± 0.010 | 0.961 ± 0.011 | 0.959 ± 0.002 | 0.960 ± 0.005 | 0.965 ± 0.008 |
 | climate-model-sim.-crashes (40994) | 0.978 ± 0.005 | 0.973 ± 0.007 | 0.970 ± 0.008 | 0.978 ± 0.019 | 0.983 ± 0.012 | 0.970 ± 0.008 |
 | **mean AUC** | 0.8843 | 0.8773 | 0.8757 | 0.8807 | 0.8849 | **0.8875** |
-| **average rank (1 = best)** | 3.00 | 4.20 | 4.27 | 3.77 | 2.90 | **2.87** |
+| **average rank among these 6 non-LLM arms (1 = best)** | 3.00 | 4.20 | 4.27 | 3.77 | 2.90 | **2.87** |
 | failed runs | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
 | median wall time / run | 0.03 s | 0.12 s | 0.11 s | 11.2 s | 60.3 s | 11.1 s |
 
@@ -143,21 +178,34 @@ correction over the 6 comparisons. No run failed, so "failures imputed" equals
 | sys_fixed − logreg | +0.0032 | [−0.0060, +0.0132] | 7/8 | 0.804 | 1.0 |
 | flaml (60 s) − lgbm | +0.0076 | [−0.0007, +0.0168] | 9/6 | 0.229 | 0.69 |
 
+`summary.md` also shows ranks among all 7 arms including `sys_llm`
+(slightly different numbers; lgbm and xgb tie there).
+
 `sys_fixed` chose random_forest 26 times, xgboost 12 times and lightgbm 7 times
-out of 45 runs.
+out of 45 runs. **XGBoost failed to train on 5 of the 15 datasets**
+(blood-transfusion, ilpd, qsar-biodeg, wdbc, cmc; every seed) because those
+targets are numerically coded 1/2 (or 1/2/3) and the trainer only
+label-encodes *string* targets; XGBoost requires 0..K−1. On those datasets
+`sys_fixed` chose between 2 candidates, not 3. This is a product bug found by
+the benchmark; it is not fixed here (fixing it changes reported numbers and
+would need a re-run). See "Proposed, not done".
 
 ### What the numbers do and don't support
 
 **They support:**
-- With the LLM steps off, the system's fixed trainer and evaluator (3 tuned
-  GBM/RF candidates, chosen by 5-fold CV AUC) beat default LightGBM by
-  +0.010 AUC on average over 15 CC18 datasets. That result survives Holm
-  correction (p = 0.040).
+- With the LLM steps off, the system's fixed trainer and evaluator (3
+  hand-configured GBM/RF candidates with imbalance weighting, chosen by 5-fold
+  CV AUC) beat default LightGBM by +0.010 AUC on average over these 15 CC18
+  datasets (Holm p = 0.040). This measures "3 configured candidates + CV
+  selection vs one default model", not anything learned by the system, and it
+  did **not** replicate on the robustness set (+0.003, Holm p = 0.41).
 - The same pipeline beat default XGBoost by +0.012 AUC, but that does not
   survive Holm correction (Holm p = 0.062).
-- The fixed pipeline is statistically indistinguishable from FLAML at an equal
-  ~11 s budget, from FLAML at 60 s, and from plain logistic regression. On these
-  small tabular datasets, logistic regression is a strong baseline.
+- The fixed pipeline is **not significantly different** from FLAML at a
+  ~11 s wall-time budget (+0.007, Holm p = 0.43; note the bootstrap CI
+  [+0.0013, +0.0128] excludes zero, so this is underpowered rather than a
+  demonstrated tie), from FLAML at 60 s, or from plain logistic regression.
+  On these small tabular datasets, logistic regression is a strong baseline.
 - The pipeline is reliable on this suite: 0/45 failures, and results are
   bit-for-bit reproducible.
 
@@ -177,31 +225,62 @@ out of 45 runs.
 - **Single holdout per seed.** Per-dataset std is large on the smallest
   datasets (credit-g, blood-transfusion, ilpd: ±0.03–0.07), larger than most
   between-arm differences.
-- **Budget asymmetry.** `sys_fixed` is not time-budgeted; it trains a fixed
-  3-model × 5-fold set. `flaml11` approximates equal time using the *median*;
-  per dataset the times differ. The default-GBM baselines get far less compute
-  than `sys_fixed`, which also runs 3 tuned models plus CV selection. Part of
-  the "+0.010 over LightGBM" is simply "more models and CV selection".
-- **Single-threaded, shared machine.** All arms were capped at 1 thread. FLAML
-  is normally run multi-core and could do more within the same wall time.
+- **Budget and compute asymmetry.** `sys_fixed` is not time-budgeted; it
+  trains a fixed 3-model × 5-fold set, **in 3 parallel threads**, while FLAML
+  ran with `n_jobs=1`. So "equal ~11 s" is equal wall time, not equal compute:
+  `sys_fixed` had up to ~3 cores. `flaml11` also matches only the *median*
+  time; per dataset the times differ, and FLAML sometimes overran its budget
+  on the loaded machine. The default-GBM baselines get far less compute than
+  `sys_fixed`. Much of the "+0.010 over LightGBM" is "more models, imbalance
+  weighting and CV selection".
+- **Shared machine.** Each library call was capped at 1 thread (see Setup).
   Wall times are from a loaded laptop and are only comparable within this run.
 - **Library versions** are newer than the repo pins (see Setup). The system was
   evaluated as it runs here, not under its pinned stack.
-- **Selection on the suite.** The datasets were picked by hand from CC18
-  (small/medium, mix of binary/multiclass and cat/missing) before any results
-  were seen, and none were dropped afterwards. They are still not a random
-  sample of CC18.
+- **Selection on the suite.** The datasets were picked by hand (rule in
+  Setup). That they were picked before any results were seen cannot be
+  verified: the list and the results were committed together. The robustness
+  set (2c) is the partial answer: the LightGBM result did not hold there.
 - **`sys_fixed` is the post-fix system.** It selects on CV, after the fix in
   commit `ba83f3a`. The original code selected on test AUC, which would inflate
   its reported numbers. This harness always scores the test set separately, so
   no arm here selects on test.
 
 
+## 2c. Robustness set: the 15 excluded CC18 datasets with ≤60 features
+
+Added at the reviewer's request after the main results. The same harness,
+3 seeds, no LLM, arms logreg / lgbm / xgb / flaml11 / sys_fixed
+(`results/robustness/`). Datasets: dresses-sales, kc2, cylinder-bands,
+balance-scale, analcatdata_dmft, tic-tac-toe, vowel, pc1,
+banknote-authentication, pc4, pc3, car, mfeat-morphological, mfeat-zernike,
+segment. 0 failures in any arm.
+
+| | logreg | lgbm | xgb | flaml11 | sys_fixed |
+|---|---|---|---|---|---|
+| mean AUC | 0.8771 | 0.8907 | 0.8860 | 0.8928 | 0.8941 |
+| average rank (5 arms) | 3.47 | 3.17 | 3.83 | 2.40 | 2.13 |
+| median wall time / run | 0.0 s | 0.2 s | 0.1 s | 22.2 s | 10.6 s |
+
+| comparison | mean ΔAUC | 95% CI | W/L | Wilcoxon p | Holm p (4 tests) |
+|---|---|---|---|---|---|
+| sys_fixed − lgbm | +0.0034 | [−0.0024, +0.0093] | 12/3 | 0.135 | 0.41 |
+| sys_fixed − xgb | +0.0080 | [+0.0014, +0.0157] | 13/2 | 0.015 | 0.060 |
+| sys_fixed − flaml11 | +0.0013 | [−0.0074, +0.0102] | 8/7 | 0.89 | 0.89 |
+| sys_fixed − logreg | +0.0170 | [−0.0036, +0.0411] | 10/5 | 0.21 | 0.42 |
+
+Reading: on these datasets no comparison survives Holm correction. The
+point estimates keep the same sign as in the main set, but the one
+significant main-set result (vs LightGBM) does not replicate. FLAML-11 s
+overran its budget here (median 22 s), so it had more wall time than
+`sys_fixed`.
+
 ## 2b. LLM arm (`sys_llm`) and leakage audit
 
-n = 15 datasets × 3 seeds = 45 runs. **27/45 runs failed (60%)**: 9 datasets
-failed on every seed and 6 completed on every seed. Failures are counted as
-failures; nothing was rerun or cherry-picked.
+n = 15 datasets × 3 seeds = 45 runs, but seeds 1–2 replay seed 0's LLM
+outputs, so the independent unit is the dataset. **9 of 15 datasets failed**
+(on every seed; 27/45 runs) and 6 completed on every seed. Failures are counted
+as failures; nothing was rerun or cherry-picked.
 
 **Why runs failed** (seed-0 records, `results/runs_sys_llm.jsonl`):
 
@@ -212,6 +291,13 @@ failures; nothing was rerun or cherry-picked.
 | | diabetes | attempt 1 exited 0 without writing output; attempts 2–3 hit the 120 s sandbox timeout |
 | FE "succeeded" but every model then failed | kc1, credit-approval | the generated ratio features produced `inf`, and the trainer's imputer/scaler rejects `inf` |
 | | kr-vs-kp | the script dropped every feature column (shape `(2556, 0)`) |
+
+**Self-correction saw truncated errors.** `_ask_llm_to_fix` sends only
+`error[:1500]`, the *head* of the traceback, so for long tracebacks the
+exception line itself is cut off. This happened in 3 of the 16 fix prompts
+(wdbc ×2, breast-w ×1; check: `llm_cache.jsonl`). wdbc then failed; breast-w
+recovered. This is a product limitation that likely lowered the
+self-correction success rate; not fixed here (see "Proposed, not done").
 
 The plan never failed (0/15 orchestrator failures). The LLM always chose
 `auc` and 4–5 models (lightgbm, xgboost, random_forest, mlp, plus
@@ -233,7 +319,7 @@ the full table is in `results/summary.md`):
 
 | | sys_llm | sys_fixed | flaml11 | flaml (60 s) |
 |---|---|---|---|---|
-| failure rate | **27/45 (60%)** | 0/45 | 0/45 | 0/45 |
+| failed datasets (runs) | **9/15 (27/45)** | 0/15 (0/45) | 0/15 | 0/15 |
 | mean AUC, failures excluded (6 datasets where every arm completed) | 0.8809 | 0.8924 | 0.8850 | 0.8877 |
 | mean AUC, failed sys_llm run falls back to sys_fixed's score (15 datasets) | 0.8829 | 0.8875 | 0.8807 | 0.8849 |
 | mean AUC, failed run scores 0.5 (15 datasets) | 0.6524 | 0.8875 | 0.8807 | 0.8849 |
@@ -294,7 +380,7 @@ Limits of the audit:
 
 - **Supported:**
   - With `qwen2.5:7b` as both planner and code generator, the agent pipeline
-    is unreliable: 60% of runs failed, all of them traceable to the generated
+    is unreliable: 9 of 15 datasets failed, all traceable to the generated
     preprocessing code or to its downstream effects.
   - Where it did complete, there is no evidence that the LLM steps improve AUC
     over the same pipeline without them. The point estimate is slightly
@@ -343,15 +429,25 @@ logical change at a time (`repro/build_commits.py`, `repro/stage_tests.sh`).
 | 1 | `a50e055` | `AgentState.orchestrator_plan` declared (`agents/state.py`). The orchestrator returns the plan under that key; the trainer and evaluator read it. | LangGraph drops undeclared keys. Repro B1: the LLM planned `[logistic_regression, mlp]` and the trainer trained `[lightgbm, random_forest, xgboost]`. B1b: planned `f1`, ranked on `auc`. The recorded demo run (`web/public/demo/run.json`) shows the same thing: 4 planned, "Training 3 models", ranked on AUC although `f1` was planned. Test `test_plan_reaches_trainer...` fails on 8987d6f (`stage_logs/e2e_commit1_tests_on_state0.txt`). | Default model list and metric fallbacks unchanged. |
 | 2 | `6343b1c` | The orchestrator profiles the CSV with the existing `_profile_dataframe` before prompting, lists all columns, rejects a target that is not a column, and normalises metric/model names to ones the trainer supports. | Repro B2: the original prompt was "Rows: unknown, Columns: unknown, Numeric columns: []". Once the plan arrives (commit 1), an unvalidated LLM model name or metric goes straight into the trainer. 2 new tests fail on commit 1. | Prompt wording otherwise unchanged; data analyst untouched. |
 | 3 | `df2de5f` | `execute_with_retry(require_output=True)` (used by the feature engineer) treats "exit 0 but no OUTPUT_CSV_PATH" as a failure that goes to self-correction. A stale output is deleted before each attempt. No code path returns the raw CSV as the "processed" one. | Repro B3a: the original FE step returned success with the **raw** CSV path. B3b: it returned a **stale** `data_processed.csv` from an earlier run. In a local LLM smoke run (qwen2.5:7b on diabetes, not part of the results) one attempt exited 0 without output; on the original code that attempt would have silently trained on raw data. New test fails on commit 2. | `_output_csv_for` and path-rewrite logic unchanged; callers without `require_output` behave as before except that the path is no longer faked. |
-| 4 | `1ff217b` | Generated code runs with an allow-listed environment (PATH, SYSTEMROOT, … plus a temp HOME/TEMP), no API keys, in a per-run temp cwd that is deleted afterwards. stdout is decoded as UTF-8. | Repro B5: `ANTHROPIC_API_KEY` was visible to generated code. New test fails on commit 3. | `sys.executable` choice and its rationale comment kept. E2B path untouched. |
+| 4 | `1ff217b` | Generated code runs with an allow-listed environment (PATH, SYSTEMROOT, … plus a temp HOME/TEMP), so it **no longer inherits API keys through the environment**, in a per-run temp cwd that is deleted afterwards. stdout is decoded as UTF-8. **This is not a sandbox**: the script can still read files by absolute path (the reviewer showed it could find the repo `.env` by walking up from the input path, narrowed by `30276d0`), read `HKCU\Environment` via `winreg` on Windows, and use the network. **It also introduced a regression** (relative input paths broke), fixed in `ba17f4a`. | Repro B5: `ANTHROPIC_API_KEY` was visible to generated code. New test fails on commit 3. | `sys.executable` choice and its rationale comment kept. E2B path untouched. |
 | 5 | `322dd9c` | Optional `AgentState.random_seed` (default 42) feeds the split, CV folds and model RNGs. | Eval enabler, not a bug fix: every `random_state` was hard-coded to 42, so multi-seed evaluation was impossible. Default behaviour is identical. | All hyperparameters unchanged. |
 | 6 | `ba83f3a` | CV scores the planned primary metric (`roc_auc`/`roc_auc_ovr`, `f1_weighted`, neg-RMSE, …). The winner is chosen on CV mean, and the test metric is only reported. `evaluation_result.selection_basis` is `cv`, or `holdout` only when CV is skipped above the 50k-row cap. | Repro B4: a model that is best on test but worse on CV won. B4b: CV used `f1_weighted` regardless of the plan. 2 new tests fail on commit 5. | Deterministic, LLM-free selection; the LLM still only narrates. The docstring rationale was kept and updated. |
 | — | `5046138` | `eval_sop/` harness, non-LLM results, `RESULTS.md`. No product code. | — | — |
+| 7 | `ba17f4a` | `_execute_subprocess` resolves the input path to absolute before running in the temp cwd. | **Regression from `1ff217b`** found by the review: the API passes relative paths (`uploads/<id>.csv`, `api/main.py`), which no longer resolved (`FileNotFoundError: 'uploads_rv/x.csv'`). New `test_relative_csv_path_still_works` failed on `a2deaf0`, passes after. | Output-path derivation unchanged. |
+| 8 | `30276d0` | The input CSV is copied into the throwaway dir and the output moved back next to the original input, so the script only ever sees paths inside its temp dir. | Review: a script found a dummy `.env` by walking `Path(INPUT_CSV_PATH).resolve().parents`. New test (`ENV_FOUND`) failed on `ba17f4a`, passes after. Narrows one exposure only — still not a sandbox. | Processed CSV still lands at `<input>_processed.csv`; stale-output deletion kept. |
+| 9 | `6593f43` | `_select_winner` ranks the models with a valid CV score by CV; models whose CV failed rank after them; holdout is used only if no model has a valid CV score. `selection_basis` follows. | Review: `use_cv = all(...)` meant one failed CV sent every model to test-set selection. New test failed on `30276d0`. Did not occur in the benchmark: 63/63 completed system runs had `selection_basis=cv`. | LLM-free deterministic selection and docstring rationale kept. |
+| — | `cbd72a3` | Test only: the env-isolation test's last assert compared stdout with an unrelated `tmp_path` and could never fail; it now checks the leaked-key list is empty and the cwd was a removed `amlpb_exec_*` dir. | Review finding. The strengthened test fails on the pre-`1ff217b` tree (keys listed). | — |
+| — | `450727a` | `repro/build_commits.py` and `repro/stage_tests.sh` no longer hard-code user/scratchpad paths (git revisions and env vars instead). Rerun: rebuilds commits 1–6 with no mismatch against `ba83f3a`. | Review finding. | — |
+| — | `e8e348b` | Username/home paths scrubbed from stage logs, repro outputs, `runs_sys_llm.jsonl`, `llm_cache.jsonl`. | Review finding. Side effect on cache replay noted in Setup. | All JSONL still parses. |
+| — | `29b0f20` | Robustness set (2c) + harness options (`--datasets-meta`, `fetch_datasets.py --robustness`, `analyze.py <dir>`), labelled rank rows in `summary.md`. | Review item 7/8. | Main-set numbers unchanged. |
 | — | `d02acc5` | Harness only, no product code. (a) `eval_sop/llm.py` can call Ollama's native `/api/chat` with `num_ctx` (needed for the ≤8192 context constraint; the OpenAI-compatible endpoint cannot set it). (b) `analyze.py` reports the three failure treatments, with Holm within two pre-declared families (LLM comparisons; non-LLM comparisons). (c) `leakage_audit_controls.py` adds positive and negative controls. The LLM arm and audit outputs are committed. | Required by the run constraints and the reporting request. | Non-LLM Holm values are unchanged (same 6-test family). |
 
 Full test suite after each commit: 83 / 85 / 86 / 87 / 87 / 88 passed, 1
-skipped. The first run of state 1 showed 8 sandbox-test failures with empty
-stderr while the machine was overloaded. A re-run passed
+skipped for commits 1–6; 89 / 90 / 91 / 91 after commits 7, 8, 9 and the test
+fix; 91 passed, 1 skipped at the head. The first run of state 1 showed 8
+failures with empty stderr while the machine was overloaded: 7 sandbox/executor
+tests and 1 end-to-end test (`test_plan_reaches_trainer...`, which runs the
+feature engineer through the same subprocess executor). A re-run passed
 (`stage_logs/full_suite_state1.txt` vs `full_suite_state1_rerun.txt`). Both logs
 are kept.
 
@@ -361,6 +457,12 @@ scripts that ran, but nothing in the product checks this at run time. See
 "Proposed, not done".
 
 ## 4. Proposed, not done
+
+- **Label-encode every classification target** (not only strings) so XGBoost
+  works on 1/2-coded targets. It failed on 5/15 main datasets (section 2).
+  Not done: it changes the reported `sys_fixed` numbers and needs a re-run.
+- **Send the tail of the traceback to self-correction**, not `error[:1500]`
+  (the head); 3/16 fix prompts lost the exception line (section 2b).
 
 - **Runtime leakage check.** Re-run the final feature-engineering script on a
   row subset and compare the overlapping rows; if they differ, populate
@@ -414,17 +516,22 @@ measured.
 
 ## 6. SOP-ready sentences (strictly true as of this commit)
 
-1. "I audited my LLM-agent AutoML system and reproduced six plumbing defects
-   with failing tests: the LLM's plan was silently discarded by the graph,
-   model selection used the test set, failed generated code fell back to raw
-   data, and generated code could read API keys. I fixed them in five commits,
-   each with a test that fails before the fix."
-2. "On 15 OpenML-CC18 datasets × 3 seeds, the system's LLM-free training and
-   CV-selection stage beat default LightGBM by +0.010 ROC AUC (95% CI
-   [+0.004, +0.017], Holm-adjusted p = 0.04) and was statistically
-   indistinguishable from FLAML at an equal ~11 s budget."
+1. "I audited my LLM-agent AutoML system and reproduced five plumbing defects
+   with failing tests: the LLM's plan was silently discarded by the agent
+   graph, the planner never saw the data, generated preprocessing code that
+   exited without writing its output (or left a stale output) was silently
+   accepted, model selection used the test set, and generated code inherited
+   API keys from the environment. I fixed each in its own commit, with a test
+   that fails before the fix; a sixth defect (leakage warnings are never
+   computed) is still open."
+2. "On 15 OpenML-CC18 datasets × 3 seeds, the system's LLM-free stage (three
+   hand-configured models plus cross-validated selection) beat a default
+   LightGBM by +0.010 ROC AUC (Holm p = 0.04) and was not significantly
+   different from FLAML at a similar wall-clock budget (Holm p = 0.43); on 15
+   further CC18 datasets the LightGBM gain shrank to +0.003 and was not
+   significant."
 3. "Ablating the LLM agents showed they did not pay off with a local 7B model:
-   generated preprocessing code broke 9 of 15 datasets (60% of runs). On the
-   6 datasets that completed, AUC was no better than the LLM-free pipeline
-   (Δ = −0.012, n.s.). A leakage audit with positive controls found no leakage
-   in the 9 generated scripts that ran."
+   generated preprocessing code broke 9 of 15 datasets, and on the 6 that
+   completed AUC was no better than the LLM-free pipeline (Δ = −0.012, n.s.);
+   a leakage audit with positive controls found no leakage in the 9 generated
+   scripts that ran."
