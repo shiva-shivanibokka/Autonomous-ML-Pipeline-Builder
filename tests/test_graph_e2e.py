@@ -237,3 +237,33 @@ def test_relative_csv_path_still_works(tmp_path, monkeypatch):
     res = _execute_subprocess(code, "uploads_rv/x.csv", 60)
     assert res["success"], res["stderr"][-500:]
     assert res["output_csv_path"] and Path(res["output_csv_path"]).exists()
+
+
+def test_generated_code_is_not_given_a_path_into_the_project(tmp_path, monkeypatch):
+    """INPUT_CSV_PATH must not lead the script to the project tree (where .env lives).
+
+    This narrows one exposure only. It is not a sandbox: the script can still
+    open absolute paths, read the registry and use the network.
+    """
+    from sandbox.executor import _execute_subprocess
+
+    project = tmp_path / "project"
+    (project / "uploads").mkdir(parents=True)
+    (project / ".env").write_text("DUMMY_API_KEY=not-a-real-key\n")
+    pd.DataFrame({"a": [1, 2]}).to_csv(project / "uploads" / "x.csv", index=False)
+    monkeypatch.chdir(project)
+    code = (
+        "import pandas as pd\n"
+        "from pathlib import Path\n"
+        "INPUT_CSV_PATH = '/data/input.csv'\n"
+        "OUTPUT_CSV_PATH = '/data/processed.csv'\n"
+        "hits = [str(p / '.env') for p in Path(INPUT_CSV_PATH).resolve().parents if (p / '.env').exists()]\n"
+        "hits += [str(p / '.env') for p in Path(OUTPUT_CSV_PATH).resolve().parents if (p / '.env').exists()]\n"
+        "print('ENV_FOUND=' + repr(hits))\n"
+        "pd.read_csv(INPUT_CSV_PATH).to_csv(OUTPUT_CSV_PATH, index=False)\n"
+    )
+    res = _execute_subprocess(code, "uploads/x.csv", 60)
+    assert res["success"], res["stderr"][-500:]
+    assert "ENV_FOUND=[]" in res["stdout"], res["stdout"]
+    # The processed CSV still lands next to the input, where the trainer expects it.
+    assert Path(res["output_csv_path"]).resolve() == (project / "uploads" / "x_processed.csv").resolve()

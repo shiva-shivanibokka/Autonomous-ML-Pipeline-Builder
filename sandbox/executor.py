@@ -225,14 +225,25 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
     if csv_path:
         csv_path = str(Path(csv_path).resolve())
     output_csv = _output_csv_for(csv_path)
-    code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", csv_path)
-    code_with_path = _rewrite_path_constant(
-        code_with_path, "OUTPUT_CSV_PATH", output_csv
-    )
 
     # A throwaway working directory per run: the script's cwd, HOME and TEMP,
     # so relative writes land somewhere disposable rather than in the repo.
     workdir = tempfile.mkdtemp(prefix="amlpb_exec_")
+
+    # The script only ever sees paths inside the throwaway directory: the input
+    # is copied in and the output is moved back out afterwards. Handing it the
+    # real upload path let it walk up to the project root (and its .env). This
+    # narrows that one exposure; it is NOT a sandbox (the script can still open
+    # absolute paths, read the registry and use the network).
+    local_in = os.path.join(workdir, "input.csv") if csv_path else ""
+    local_out = os.path.join(workdir, "processed.csv") if output_csv else ""
+    if csv_path and Path(csv_path).exists():
+        import shutil
+
+        shutil.copyfile(csv_path, local_in)
+    code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", local_in)
+    code_with_path = _rewrite_path_constant(code_with_path, "OUTPUT_CSV_PATH", local_out)
+
     script_path = os.path.join(workdir, "generated.py")
     with open(script_path, "w", encoding="utf-8") as f:
         f.write(code_with_path)
@@ -256,6 +267,10 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             env=_sandbox_env(workdir),
         )
         success = result.returncode == 0
+        if local_out and Path(local_out).exists():
+            import shutil
+
+            shutil.move(local_out, output_csv)
         return {
             "success": success,
             "stdout": result.stdout,
