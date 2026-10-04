@@ -62,8 +62,11 @@ def _select_winner(
     same test number as the result, an optimistic bias. The holdout metric is
     now only reported, never used to choose.
 
-    If CV is unavailable for every model (skipped above the row cap), the
-    holdout metric is used as a last resort; `selection_basis()` says which.
+    Models whose CV failed are ranked after every model with a valid CV score
+    and cannot win while any valid score exists. (Previously one failed CV run
+    sent the whole selection to the test set.) Only if no model has a valid CV
+    score, e.g. CV skipped above the row cap, is the holdout metric used, as a
+    last resort; `selection_basis()` says which.
     """
     valid = {
         n: r
@@ -73,14 +76,17 @@ def _select_winner(
     if not valid:
         return None, []
 
-    use_cv = all(_cv_is_valid(r) for r in valid.values())
+    cv_ok = [n for n, r in valid.items() if _cv_is_valid(r)]
+    if cv_ok:
+        # CV scorers are all "higher is better" (neg_* for error metrics).
+        ranked = sorted(cv_ok, key=lambda n: (float(valid[n].get("cv_mean", -1e18)), n), reverse=True)
+        ranked += sorted(n for n in valid if n not in cv_ok)
+        return ranked[0], ranked
+
     lower_better = primary_metric in _LOWER_IS_BETTER
 
     def sort_key(name: str) -> tuple[float, str]:
         r = valid[name]
-        if use_cv:
-            # CV scorers are all "higher is better" (neg_* for error metrics).
-            return (float(r.get("cv_mean", -1e18)), name)
         primary = r.get("metrics", {}).get(primary_metric)
         # Orient so that "bigger key = better" regardless of metric direction.
         if primary is None:
@@ -92,9 +98,9 @@ def _select_winner(
 
 
 def selection_basis(model_results: dict[str, Any]) -> str:
-    """'cv' when the winner was chosen on CV, 'holdout' for the row-cap fallback."""
+    """'cv' when the winner was chosen on CV, 'holdout' when no model had a valid CV score."""
     valid = [r for r in model_results.values() if not r.get("error")]
-    return "cv" if valid and all(_cv_is_valid(r) for r in valid) else "holdout"
+    return "cv" if any(_cv_is_valid(r) for r in valid) else "holdout"
 
 
 # The LLM writes a human-readable justification for the ALREADY-decided winner.

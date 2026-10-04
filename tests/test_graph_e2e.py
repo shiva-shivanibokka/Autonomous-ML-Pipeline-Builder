@@ -267,3 +267,20 @@ def test_generated_code_is_not_given_a_path_into_the_project(tmp_path, monkeypat
     assert "ENV_FOUND=[]" in res["stdout"], res["stdout"]
     # The processed CSV still lands next to the input, where the trainer expects it.
     assert Path(res["output_csv_path"]).resolve() == (project / "uploads" / "x_processed.csv").resolve()
+
+
+def test_one_failed_cv_does_not_send_selection_to_the_test_set():
+    from agents.evaluator import _select_winner, selection_basis
+
+    results = {
+        "cv_failed": {"metrics": {"auc": 0.99}, "cv_mean": 0.0, "cv_metric": "failed:roc_auc",
+                      "model_object": object(), "error": None},
+        "test_best": {"metrics": {"auc": 0.95}, "cv_mean": 0.70, "cv_metric": "roc_auc",
+                      "model_object": object(), "error": None},
+        "cv_best": {"metrics": {"auc": 0.80}, "cv_mean": 0.85, "cv_metric": "roc_auc",
+                    "model_object": object(), "error": None},
+    }
+    winner, ranking = _select_winner(results, "auc")
+    assert winner == "cv_best"
+    assert ranking == ["cv_best", "test_best", "cv_failed"]
+    assert selection_basis(results) == "cv"
