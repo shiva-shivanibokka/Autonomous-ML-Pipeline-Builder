@@ -178,5 +178,17 @@
     "n_categorical": 0,
     "pct_missing_cells": 0.0,
     "csv": "40984_segment.csv"
+  },
+  {
+    "openml_id": 46,
+    "name": "splice",
+    "version": 1,
+    "target": "Class",
+    "n_rows": 3190,
+    "n_features": 60,
+    "n_classes": 3,
+    "n_categorical": 60,
+    "pct_missing_cells": 0.0,
+    "csv": "46_splice.csv"
   }
 ]

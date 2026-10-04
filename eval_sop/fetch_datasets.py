@@ -30,7 +30,10 @@ DATASETS = [
 ]
 
 # Robustness set, added after the main results (review request): every other
-# OpenML-CC18 dataset with 500-3,200 rows and <= 60 features. Selection rule
+# OpenML-CC18 dataset with 500-3,200 rows and <= 60 features (cc18_candidates.json
+# lists all 42 row-filter candidates with their feature counts, so the filter is
+# mechanically checkable). splice (60 features, exactly on the boundary) was
+# missed when this list was first written and added after a review caught it. Selection rule
 # for both sets is stated in RESULTS.md; this list was not pre-registered.
 ROBUSTNESS = [
     (23381, "dresses-sales"),
@@ -48,6 +51,7 @@ ROBUSTNESS = [
     (18, "mfeat-morphological"),
     (22, "mfeat-zernike"),
     (40984, "segment"),
+    (46, "splice"),
 ]
 
 out = Path(__file__).parent / "data"
