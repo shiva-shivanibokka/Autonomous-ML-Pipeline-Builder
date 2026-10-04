@@ -94,7 +94,7 @@ _______________ test_generated_code_runs_under_this_interpreter _______________
         """
         The subprocess backend invoked bare "python". Inside a venv that is the
         wrong interpreter, and on a slim container or most Linux hosts there is no
-        "python" on PATH at all — the sandbox simply could not start.
+        "python" on PATH at all â€” the sandbox simply could not start.
         """
         result = _execute_subprocess("import sys; print(sys.executable)", "", 60)
 >       assert result["success"], result["stderr"]
