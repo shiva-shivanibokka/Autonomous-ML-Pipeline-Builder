@@ -203,8 +203,12 @@ def test_generated_code_does_not_see_api_keys(tmp_path):
     with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-secret", "GROQ_API_KEY": "g"}):
         res = _execute_subprocess(code, "", 30)
     assert res["success"], res["stderr"]
-    assert "LEAKED=\n" in res["stdout"] or res["stdout"].startswith("LEAKED=\n")
-    assert str(tmp_path) not in res["stdout"]
+    lines = dict(line.split("=", 1) for line in res["stdout"].splitlines() if "=" in line)
+    assert lines["LEAKED"] == ""  # no *KEY* / *TOKEN* variable reached the script
+    # It ran in a throwaway directory (not the caller's cwd) that was removed afterwards.
+    assert Path(lines["CWD"]).resolve() != Path.cwd().resolve()
+    assert Path(lines["CWD"]).name.startswith("amlpb_exec_")
+    assert not Path(lines["CWD"]).exists()
 
 
 def test_selection_uses_cv_not_holdout():
