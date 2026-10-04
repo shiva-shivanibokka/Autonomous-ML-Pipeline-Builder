@@ -1,22 +1,31 @@
-"""Build per-commit file versions from HEAD by ordered edits; verify the last equals the working tree.
+"""Rebuild the six fix commits (a50e055..ba83f3a) from the base commit by ordered edits.
 
-Usage: python amlpb_build_commits.py <outdir>
+Provenance tool: shows that commits 1-6 are exactly a sequence of small edits
+to 8987d6f and that applying them reproduces ba83f3a byte-for-byte.
+
+Usage (from anywhere inside the repo): python eval_sop/repro/build_commits.py <outdir>
 Writes <outdir>/<n>/<path> for each commit n (only files touched up to n).
 """
 import subprocess
 import sys
 from pathlib import Path
 
-WT = Path(r"<SCRATCH>\wt\Autonomous-ML-Pipeline-Builder")
+WT = Path(__file__).resolve().parents[2]  # repo root
+BASE, FINAL = "8987d6f", "ba83f3a"
 OUT = Path(sys.argv[1])
 
 
+def _show(rev, p):
+    out = subprocess.run(["git", "-C", str(WT), "show", f"{rev}:{p}"], capture_output=True, check=True).stdout
+    return out.decode("utf-8").replace("\r\n", "\n")
+
+
 def head(p):
-    return subprocess.run(["git", "-C", str(WT), "show", f"HEAD:{p}"], capture_output=True, check=True).stdout.decode("utf-8").replace("\r\n", "\n")
+    return _show(BASE, p)
 
 
 def final(p):
-    return (WT / p).read_text(encoding="utf-8").replace("\r\n", "\n")
+    return _show(FINAL, p)
 
 
 def between(text, start, end):
