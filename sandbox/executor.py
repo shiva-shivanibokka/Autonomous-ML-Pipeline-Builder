@@ -220,6 +220,10 @@ def _sandbox_env(workdir: str) -> dict[str, str]:
 
 def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
     """Execute code in a local subprocess with timeout (fallback for local dev)."""
+    # The script runs with cwd = a throwaway directory, so a relative path from
+    # the caller (the API passes "uploads/<id>.csv") must be made absolute here.
+    if csv_path:
+        csv_path = str(Path(csv_path).resolve())
     output_csv = _output_csv_for(csv_path)
     code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", csv_path)
     code_with_path = _rewrite_path_constant(

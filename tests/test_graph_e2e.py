@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import json
 import os
+from pathlib import Path
 from unittest.mock import patch
 
 import numpy as np
@@ -218,3 +219,21 @@ def test_selection_uses_cv_not_holdout():
     }
     winner, ranking = _select_winner(results, "auc")
     assert winner == "b" and ranking == ["b", "a"]
+
+
+def test_relative_csv_path_still_works(tmp_path, monkeypatch):
+    """The API passes relative paths (uploads/<id>.csv); the script runs in a temp cwd."""
+    from sandbox.executor import _execute_subprocess
+
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uploads_rv").mkdir()
+    pd.DataFrame({"a": [1, 2]}).to_csv(tmp_path / "uploads_rv" / "x.csv", index=False)
+    code = (
+        "import pandas as pd\n"
+        "INPUT_CSV_PATH = '/data/input.csv'\n"
+        "OUTPUT_CSV_PATH = '/data/processed.csv'\n"
+        "pd.read_csv(INPUT_CSV_PATH).to_csv(OUTPUT_CSV_PATH, index=False)\n"
+    )
+    res = _execute_subprocess(code, "uploads_rv/x.csv", 60)
+    assert res["success"], res["stderr"][-500:]
+    assert res["output_csv_path"] and Path(res["output_csv_path"]).exists()
