@@ -715,6 +715,14 @@
     "sys_fixed": 2.933333333333333,
     "sys_llm": 6.2
   },
+  "avg_rank_non_llm": {
+    "logreg": 3.0,
+    "lgbm": 4.2,
+    "xgb": 4.266666666666667,
+    "flaml11": 3.7666666666666666,
+    "flaml": 2.9,
+    "sys_fixed": 2.8666666666666667
+  },
   "mean_auc_fallback_fixed": {
     "logreg": 0.8842652849809792,
     "lgbm": 0.877344358433844,

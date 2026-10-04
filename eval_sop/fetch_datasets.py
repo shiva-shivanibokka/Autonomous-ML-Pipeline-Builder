@@ -5,6 +5,7 @@ rows, so the full LLM arm fits a local-model budget. Each CSV keeps the
 OpenML default target, renamed to nothing: the column name is preserved.
 """
 import json
+import sys
 from pathlib import Path
 
 import openml
@@ -28,10 +29,32 @@ DATASETS = [
     (3, "kr-vs-kp"),
 ]
 
+# Robustness set, added after the main results (review request): every other
+# OpenML-CC18 dataset with 500-3,200 rows and <= 60 features. Selection rule
+# for both sets is stated in RESULTS.md; this list was not pre-registered.
+ROBUSTNESS = [
+    (23381, "dresses-sales"),
+    (1063, "kc2"),
+    (6332, "cylinder-bands"),
+    (11, "balance-scale"),
+    (469, "analcatdata_dmft"),
+    (50, "tic-tac-toe"),
+    (307, "vowel"),
+    (1068, "pc1"),
+    (1462, "banknote-authentication"),
+    (1049, "pc4"),
+    (1050, "pc3"),
+    (40975, "car"),
+    (18, "mfeat-morphological"),
+    (22, "mfeat-zernike"),
+    (40984, "segment"),
+]
+
 out = Path(__file__).parent / "data"
 out.mkdir(exist_ok=True)
+robust = "--robustness" in sys.argv
 meta = []
-for did, name in DATASETS:
+for did, name in (ROBUSTNESS if robust else DATASETS):
     ds = openml.datasets.get_dataset(did, download_data=True, download_qualities=False,
                                      download_features_meta_data=False)
     X, y, cat, cols = ds.get_data(target=ds.default_target_attribute, dataset_format="dataframe")
@@ -45,4 +68,5 @@ for did, name in DATASETS:
                  "n_categorical": int(sum(cat)), "pct_missing_cells": round(float(X.isna().mean().mean()) * 100, 2),
                  "csv": p.name})
     print(meta[-1], flush=True)
-(Path(__file__).parent / "datasets.json").write_text(json.dumps(meta, indent=2))
+(Path(__file__).parent / ("datasets_robustness.json" if robust else "datasets.json")).write_text(
+    json.dumps(meta, indent=2))

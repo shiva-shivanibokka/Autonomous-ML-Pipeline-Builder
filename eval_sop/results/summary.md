@@ -20,7 +20,8 @@ Datasets: 15; seeds: [0, 1, 2]; metric: test ROC AUC (macro OvR for multiclass).
 | **mean AUC (fail = 0.5)** | 0.8843 | 0.8773 | 0.8757 | 0.8807 | 0.8849 | 0.8875 | 0.6524 |
 | **mean AUC, sys_llm failures -> sys_fixed fallback** | 0.8843 | 0.8773 | 0.8757 | 0.8807 | 0.8849 | 0.8875 | 0.8829 |
 | **mean AUC, failures excluded (6 datasets where every arm completed every seed)** | 0.8918 | 0.8867 | 0.8873 | 0.8850 | 0.8877 | 0.8924 | 0.8809 |
-| **average rank (1 = best)** | 3.13 | 4.40 | 4.40 | 3.90 | 3.03 | 2.93 | 6.20 |
+| **average rank among all 7 arms (1 = best; failed run = 0.5)** | 3.13 | 4.40 | 4.40 | 3.90 | 3.03 | 2.93 | 6.20 |
+| **average rank among the non-LLM arms only** | 3.00 | 4.20 | 4.27 | 3.77 | 2.90 | 2.87 | - |
 | failed runs | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 | 27/45 |
 | median wall time per run (s) | 0.0 | 0.1 | 0.1 | 11.2 | 60.3 | 11.1 | 9.2 |
 

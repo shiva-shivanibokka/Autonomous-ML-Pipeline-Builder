@@ -311,6 +311,8 @@ def main():
                     help="use Ollama's native /api/chat with this context window (e.g. 8192)")
     ap.add_argument("--out", default=str(RESULTS / "runs.jsonl"))
     ap.add_argument("--skip-done", action="store_true")
+    ap.add_argument("--datasets-meta", default="datasets.json",
+                    help="dataset list under eval_sop/ (datasets_robustness.json for the robustness set)")
     ap.add_argument("--cache", default=str(RESULTS / "llm_cache.jsonl"))
     args = ap.parse_args()
 
@@ -318,7 +320,7 @@ def main():
     os.chdir(HERE.parent)
     RESULTS.mkdir(exist_ok=True)
     WORK.mkdir(exist_ok=True)
-    meta = json.loads((HERE / "datasets.json").read_text())
+    meta = json.loads((HERE / args.datasets_meta).read_text())
     if args.datasets:
         meta = [d for d in meta if d["openml_id"] in args.datasets]
 

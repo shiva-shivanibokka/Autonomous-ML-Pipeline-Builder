@@ -40,6 +40,11 @@ def boot_ci(d, n=10000, seed=0):
 
 
 def main():
+    import sys
+
+    global RES
+    if len(sys.argv) > 1:  # optional results directory, e.g. eval_sop/results/robustness
+        RES = Path(sys.argv[1]).resolve()
     runs = [json.loads(x) for f in sorted(RES.glob("runs*.jsonl"))
             for x in f.read_text(encoding="utf-8").splitlines() if x.strip()]
     # Last record wins for a duplicated (arm, dataset, seed).
@@ -92,6 +97,10 @@ def main():
     M = np.array([[ds_mean(a, ds, True) for a in arms] for ds in dsets], float)
     ranks = np.vstack([rankdata(-row) for row in M])
     summary["avg_rank_imputed"] = {a: float(ranks[:, i].mean()) for i, a in enumerate(arms)}
+    if "sys_llm" in arms:  # ranks without the LLM arm, as quoted for the non-LLM comparison
+        idx = [i for i, a in enumerate(arms) if a != "sys_llm"]
+        rk = np.vstack([rankdata(-row) for row in M[:, idx]])
+        summary["avg_rank_non_llm"] = {arms[i]: float(rk[:, j].mean()) for j, i in enumerate(idx)}
     MF = np.array([[ds_mean(a, ds, "fixed") if a == "sys_llm" else ds_mean(a, ds, True) for a in arms] for ds in dsets], float)
     summary["mean_auc_fallback_fixed"] = {a: float(MF[:, i].mean()) for i, a in enumerate(arms)}
     ok_ds = [ds for ds in dsets if all(ds_mean(a, ds, False) is not None for a in arms)]
@@ -193,7 +202,12 @@ def main():
     L.append("| **mean AUC, sys_llm failures -> sys_fixed fallback** | " + " | ".join(f"{summary['mean_auc_fallback_fixed'][a]:.4f}" for a in arms) + " |")
     L.append(f"| **mean AUC, failures excluded ({len(ok_ds)} datasets where every arm completed every seed)** | "
              + " | ".join(f"{summary['mean_auc_failures_excluded'][a]:.4f}" if ok_ds else "-" for a in arms) + " |")
-    L.append("| **average rank (1 = best)** | " + " | ".join(f"{summary['avg_rank_imputed'][a]:.2f}" for a in arms) + " |")
+    L.append(f"| **average rank among all {len(arms)} arms (1 = best; failed run = 0.5)** | "
+             + " | ".join(f"{summary['avg_rank_imputed'][a]:.2f}" for a in arms) + " |")
+    if "avg_rank_non_llm" in summary:
+        L.append("| **average rank among the non-LLM arms only** | "
+                 + " | ".join(f"{summary['avg_rank_non_llm'][a]:.2f}" if a in summary["avg_rank_non_llm"] else "-"
+                              for a in arms) + " |")
     L.append("| failed runs | " + " | ".join(f"{per_arm[a]['failed']}/{per_arm[a]['runs']}" for a in arms) + " |")
     L.append("| median wall time per run (s) | " + " | ".join(f"{per_arm[a]['wall_median_s']:.1f}" for a in arms) + " |")
     L.append("")
