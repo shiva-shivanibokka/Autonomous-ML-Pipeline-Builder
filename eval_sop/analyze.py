@@ -24,12 +24,14 @@ from scipy.stats import rankdata, wilcoxon
 
 HERE = Path(__file__).resolve().parent
 RES = HERE / "results"
-ARMS = ["logreg", "lgbm", "xgb", "flaml11", "flaml", "sys_fixed", "sys_llm"]
+ARMS = ["logreg", "lgbm", "xgb", "flaml11", "flaml", "sys_fixed", "sys_fixed_trainw", "sys_llm"]
 # Two pre-declared families; Holm is applied within each family and failure mode.
 LLM_PAIRS = [("sys_llm", "sys_fixed"), ("sys_llm", "flaml11"), ("sys_llm", "flaml")]
 NONLLM_PAIRS = [("sys_fixed", "flaml"), ("sys_fixed", "flaml11"), ("sys_fixed", "lgbm"),
                 ("sys_fixed", "xgb"), ("sys_fixed", "logreg"), ("flaml", "lgbm")]
-PAIRS = LLM_PAIRS + NONLLM_PAIRS
+# Sensitivity check, reported on its own (not part of the corrected family).
+EXTRA_PAIRS = [("sys_fixed_trainw", "sys_fixed")]
+PAIRS = LLM_PAIRS + NONLLM_PAIRS + EXTRA_PAIRS
 
 
 def boot_ci(d, n=10000, seed=0):
@@ -127,7 +129,7 @@ def main():
             except ValueError:
                 p = float("nan")
             lo, hi = boot_ci(d)
-            tests.append({"a": a, "b": b, "mode": mode, "family": "llm" if (a, b) in LLM_PAIRS else "non_llm",
+            tests.append({"a": a, "b": b, "mode": mode, "family": ("llm" if (a, b) in LLM_PAIRS else "sensitivity" if (a, b) in EXTRA_PAIRS else "non_llm"),
                           "n_datasets": len(d),
                           "mean_diff": float(d.mean()), "median_diff": float(np.median(d)),
                           "ci95": [lo, hi], "wins": int((d > 0).sum()), "losses": int((d < 0).sum()),
@@ -153,6 +155,21 @@ def main():
                       "wall_median_s": float(np.median(walls)), "wall_mean_s": float(np.mean(walls)),
                       "wall_total_s": float(np.sum(walls)),
                       "errors": Counter((r.get("error") or "")[:90] for r in rs if not r.get("ok")).most_common(5)}
+    # Candidate models that errored inside a completed system run (item 2: the
+    # XGBoost target-coding bug). A run still "succeeds" with fewer candidates.
+    cand = {}
+    for a in arms:
+        rs = [r for r in runs if r["arm"] == a and r.get("ok") and r.get("models")]
+        per = {}
+        for r in rs:
+            for name, m in r["models"].items():
+                if m.get("error"):
+                    per.setdefault(name, {"runs": 0, "datasets": set()})
+                    per[name]["runs"] += 1
+                    per[name]["datasets"].add(r["dataset"])
+        if per:
+            cand[a] = {k: {"runs": v["runs"], "datasets": sorted(v["datasets"])} for k, v in per.items()}
+    summary["candidate_model_failures"] = cand
     summary["per_arm"] = per_arm
 
     # LLM-arm diagnostics.
@@ -208,6 +225,13 @@ def main():
         L.append("| **average rank among the non-LLM arms only** | "
                  + " | ".join(f"{summary['avg_rank_non_llm'][a]:.2f}" if a in summary["avg_rank_non_llm"] else "-"
                               for a in arms) + " |")
+    if "candidate_model_failures" in summary and summary["candidate_model_failures"]:
+        L.append("| candidate models that errored inside completed runs | "
+                 + " | ".join(
+                     ("; ".join(f"{k} on {len(v['datasets'])} ds ({v['runs']} runs)"
+                                for k, v in summary["candidate_model_failures"][a].items())
+                      if a in summary["candidate_model_failures"] else "none")
+                     for a in arms) + " |")
     L.append("| failed runs | " + " | ".join(f"{per_arm[a]['failed']}/{per_arm[a]['runs']}" for a in arms) + " |")
     L.append("| median wall time per run (s) | " + " | ".join(f"{per_arm[a]['wall_median_s']:.1f}" for a in arms) + " |")
     L.append("")

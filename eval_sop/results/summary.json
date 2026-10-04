@@ -12,6 +12,7 @@
     "flaml11",
     "flaml",
     "sys_fixed",
+    "sys_fixed_trainw",
     "sys_llm"
   ],
   "per_dataset": [
@@ -49,6 +50,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.9998956335694623,
+        "std": 0.00010041879847069229,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.9998956335694623,
         "std": 0.00010041879847069229,
         "n_ok": 3,
@@ -100,6 +107,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9888285024154589,
+        "std": 0.008134331991876903,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": 0.9854317632850242,
         "std": 0.01152520774475783,
@@ -141,6 +154,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.739588727464423,
+        "std": 0.030093058746298987,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.739588727464423,
         "std": 0.030093058746298987,
         "n_ok": 3,
@@ -192,6 +211,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9496132283017529,
+        "std": 0.022084740590932038,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": null,
         "std": null,
@@ -233,6 +258,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.7929365079365079,
+        "std": 0.06997188588865402,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.7929365079365079,
         "std": 0.06997188588865402,
         "n_ok": 3,
@@ -284,6 +315,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.829074074074074,
+        "std": 0.03324112761561723,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": null,
         "std": null,
@@ -325,6 +362,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.9328427345224221,
+        "std": 0.004497353911621366,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.9328427345224221,
         "std": 0.004497353911621366,
         "n_ok": 3,
@@ -376,6 +419,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9139472279457094,
+        "std": 0.011056471908834012,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": 0.9137125582634722,
         "std": 0.010523791716455176,
@@ -417,6 +466,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.8335631688572867,
+        "std": 0.004638197781006676,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.8335631688572867,
         "std": 0.004638197781006676,
         "n_ok": 3,
@@ -468,6 +523,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.7243339831059129,
+        "std": 0.05093952580872189,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": 0.6632959714100064,
         "std": 0.08302142995622369,
@@ -509,6 +570,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.7585636664304275,
+        "std": 0.05458656412490921,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.7585636664304275,
         "std": 0.05458656412490921,
         "n_ok": 3,
@@ -560,6 +627,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9238095238095237,
+        "std": 0.016213213424534474,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": null,
         "std": null,
@@ -606,6 +679,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9907407407407408,
+        "std": 0.0034524823111476903,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": null,
         "std": null,
@@ -647,6 +726,12 @@
         "n_fail": 0
       },
       "sys_fixed": {
+        "mean": 0.9645846777645494,
+        "std": 0.008418797879656336,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
         "mean": 0.9645846777645494,
         "std": 0.008418797879656336,
         "n_ok": 3,
@@ -698,6 +783,12 @@
         "n_ok": 3,
         "n_fail": 0
       },
+      "sys_fixed_trainw": {
+        "mean": 0.9719416386083052,
+        "std": 0.011717515722683007,
+        "n_ok": 3,
+        "n_fail": 0
+      },
       "sys_llm": {
         "mean": 0.9652076318742986,
         "std": 0.01698400218902532,
@@ -707,21 +798,23 @@
     }
   ],
   "avg_rank_imputed": {
-    "logreg": 3.1333333333333333,
-    "lgbm": 4.4,
-    "xgb": 4.4,
-    "flaml11": 3.9,
-    "flaml": 3.033333333333333,
-    "sys_fixed": 2.933333333333333,
-    "sys_llm": 6.2
+    "logreg": 3.6,
+    "lgbm": 5.266666666666667,
+    "xgb": 5.2,
+    "flaml11": 4.566666666666666,
+    "flaml": 3.5,
+    "sys_fixed": 3.533333333333333,
+    "sys_fixed_trainw": 3.2,
+    "sys_llm": 7.133333333333334
   },
   "avg_rank_non_llm": {
-    "logreg": 3.0,
-    "lgbm": 4.2,
-    "xgb": 4.266666666666667,
-    "flaml11": 3.7666666666666666,
-    "flaml": 2.9,
-    "sys_fixed": 2.8666666666666667
+    "logreg": 3.466666666666667,
+    "lgbm": 5.066666666666666,
+    "xgb": 5.066666666666666,
+    "flaml11": 4.433333333333334,
+    "flaml": 3.3666666666666667,
+    "sys_fixed": 3.466666666666667,
+    "sys_fixed_trainw": 3.1333333333333333
   },
   "mean_auc_fallback_fixed": {
     "logreg": 0.8842652849809792,
@@ -730,6 +823,7 @@
     "flaml11": 0.8807040957049797,
     "flaml": 0.8849442733178797,
     "sys_fixed": 0.8875084618122131,
+    "sys_fixed_trainw": 0.8876176023697704,
     "sys_llm": 0.8829079816172615
   },
   "datasets_all_arms_completed": [
@@ -747,6 +841,7 @@
     "flaml11": 0.8850206469043678,
     "flaml": 0.8877363394378102,
     "sys_fixed": 0.8924000079971969,
+    "sys_fixed_trainw": 0.8927620896294073,
     "sys_llm": 0.880898807509818
   },
   "mean_auc_imputed": {
@@ -756,6 +851,7 @@
     "flaml11": 0.8807040957049797,
     "flaml": 0.8849442733178797,
     "sys_fixed": 0.8875084618122131,
+    "sys_fixed_trainw": 0.8876176023697704,
     "sys_llm": 0.6523595230039272
   },
   "paired_tests": [
@@ -1136,8 +1232,78 @@
       "ties": 0,
       "wilcoxon_p": 0.22930908203125,
       "holm_p": 0.68792724609375
+    },
+    {
+      "a": "sys_fixed_trainw",
+      "b": "sys_fixed",
+      "mode": "completed",
+      "family": "sensitivity",
+      "n_datasets": 15,
+      "mean_diff": 0.00010914055755741891,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.0004485552324987004,
+        0.0006110154278101391
+      ],
+      "wins": 4,
+      "losses": 1,
+      "ties": 10,
+      "wilcoxon_p": 0.5001842570707944,
+      "holm_p": 0.5001842570707944
+    },
+    {
+      "a": "sys_fixed_trainw",
+      "b": "sys_fixed",
+      "mode": "imputed",
+      "family": "sensitivity",
+      "n_datasets": 15,
+      "mean_diff": 0.00010914055755741891,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.0004485552324987004,
+        0.0006110154278101391
+      ],
+      "wins": 4,
+      "losses": 1,
+      "ties": 10,
+      "wilcoxon_p": 0.5001842570707944,
+      "holm_p": 0.5001842570707944
     }
   ],
+  "candidate_model_failures": {
+    "sys_fixed": {
+      "xgboost": {
+        "runs": 15,
+        "datasets": [
+          "blood-transfusion",
+          "cmc",
+          "ilpd",
+          "qsar-biodeg",
+          "wdbc"
+        ]
+      }
+    },
+    "sys_fixed_trainw": {
+      "xgboost": {
+        "runs": 15,
+        "datasets": [
+          "blood-transfusion",
+          "cmc",
+          "ilpd",
+          "qsar-biodeg",
+          "wdbc"
+        ]
+      }
+    },
+    "sys_llm": {
+      "xgboost": {
+        "runs": 3,
+        "datasets": [
+          "blood-transfusion"
+        ]
+      }
+    }
+  },
   "per_arm": {
     "logreg": {
       "runs": 45,
@@ -1185,6 +1351,14 @@
       "wall_median_s": 11.14,
       "wall_mean_s": 12.140444444444446,
       "wall_total_s": 546.32,
+      "errors": []
+    },
+    "sys_fixed_trainw": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 8.61,
+      "wall_mean_s": 9.166444444444446,
+      "wall_total_s": 412.49000000000007,
       "errors": []
     },
     "sys_llm": {
