@@ -9,6 +9,11 @@ Arms (all see the same stratified 80/20 split of the same CSV for a seed):
   sys_llm     this system's LangGraph agents: orchestrator -> data analyst ->
               feature engineer (LLM code, run in a stripped subprocess) ->
               model trainer -> evaluator. LLM = local Ollama model.
+  sys_fixed_trainw  sensitivity arm: identical to sys_fixed except the imbalance
+              weight is computed from the TRAINING split only. The product computes
+              scale_pos_weight / class_weight from the full label column before the
+              split (agents/model_trainer.py), a test-set-dependent choice; this arm
+              measures whether it matters.
   sys_fixed   the same trainer + evaluator nodes with every LLM step removed:
               fixed plan (lightgbm, xgboost, random_forest; select on CV AUC),
               no generated feature engineering, raw CSV.
@@ -195,7 +200,21 @@ def _winner_score(final, target, seed):
     return score(yte, pipe.predict_proba(Xte)), len(df), y
 
 
-def arm_system(ds, df, seed, planner, codegen, use_llm):
+def _train_with_train_only_weight(real):
+    """Wrap _train_single_model so scale_pos is recomputed from y_train alone."""
+
+    def wrapper(*a, **kw):
+        y_train = kw["y_train"]
+        classes, counts = np.unique(np.asarray(y_train), return_counts=True)
+        if kw.get("task_type") == "classification" and len(classes) == 2:
+            neg, pos = counts.max(), counts.min()
+            kw["scale_pos"] = round(float(neg) / float(pos), 3) if pos else 1.0
+        return real(*a, **kw)
+
+    return wrapper
+
+
+def arm_system(ds, df, seed, planner, codegen, use_llm, train_only_weight=False):
     import pipeline.graph as g
     import sandbox.executor as ex
     from agents.evaluator import run_evaluator
@@ -212,6 +231,11 @@ def arm_system(ds, df, seed, planner, codegen, use_llm):
     extra: dict = {}
     ps = _system_patches(planner if use_llm else None, codegen)
     ps.append(patch("sandbox.executor._execute_subprocess", attempts))
+    if train_only_weight:
+        import agents.model_trainer as mt
+
+        ps.append(patch("agents.model_trainer._train_single_model",
+                        _train_with_train_only_weight(mt._train_single_model)))
     ps.append(patch("sandbox.executor.settings"))
     started = [p.start() for p in ps]
     try:
@@ -292,7 +316,8 @@ def arm_system(ds, df, seed, planner, codegen, use_llm):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--arms", nargs="+", default=["logreg", "lgbm", "xgb", "flaml", "sys_fixed"])
+    ap.add_argument("--arms", nargs="+",
+                    default=["logreg", "lgbm", "xgb", "flaml", "sys_fixed", "sys_fixed_trainw"])
     ap.add_argument("--seeds", nargs="+", type=int, default=[0, 1, 2])
     ap.add_argument("--datasets", nargs="*", type=int, default=None, help="OpenML ids")
     ap.add_argument("--flaml-budget", type=int, default=60)
@@ -374,6 +399,9 @@ def main():
                         sc, extra = arm_flaml(df, ds["target"], seed, args.flaml_budget)
                     elif arm == "sys_fixed":
                         sc, extra = arm_system(ds, df, seed, None, None, use_llm=False)
+                    elif arm == "sys_fixed_trainw":
+                        sc, extra = arm_system(ds, df, seed, None, None, use_llm=False,
+                                               train_only_weight=True)
                     elif arm == "sys_llm":
                         sc, extra = arm_system(ds, df, seed, planner, codegen, use_llm=True)
                     else:
