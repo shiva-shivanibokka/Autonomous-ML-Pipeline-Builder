@@ -13,8 +13,9 @@ fixes, the mocked-LLM end-to-end test, all non-LLM arms, the LLM arm (local
 - None of the 9 generated feature-engineering scripts that ran was flagged for
   leakage. Positive controls show the audit detects leakage when it is present.
 - The LLM-free pipeline's +0.010 AUC win over default LightGBM on the main 15
-  datasets did **not** replicate on 15 further CC18 datasets (+0.003, Holm
-  p = 0.41; section 2c).
+  datasets did **not** replicate on 16 further CC18 datasets (+0.003, Holm
+  p = 0.39; section 2c). It is reported here as a non-replicating point
+  estimate, not as a result.
 
 **Review fixes (after an adversarial review):** a relative-path regression
 introduced by commit `1ff217b` was fixed (`ba17f4a`); generated code now only
@@ -81,15 +82,42 @@ the raw records.
 | `logreg` | `LogisticRegression(max_iter=1000)` behind the system's own preprocessor (median impute + scale, most-frequent impute + one-hot) |
 | `lgbm` | LightGBM with library defaults, same preprocessor |
 | `xgb` | XGBoost with library defaults, same preprocessor |
-| `flaml11` | FLAML AutoML, `time_budget=11 s`, metric `roc_auc`/`roc_auc_ovr`. The budget matches the median wall time of `sys_fixed` (11.1 s). |
+| `flaml11` | FLAML AutoML, **nominal** `time_budget=11 s`, metric `roc_auc`/`roc_auc_ovr`. 11 s was chosen to match `sys_fixed`'s median wall time (11.1 s), but FLAML treats the budget loosely and often overran it, so this is *not* an equal-budget comparison in either direction — see "Compute was not equalised". |
 | `flaml` | FLAML AutoML, `time_budget=60 s` (about 5x the system's median time) |
-| `sys_fixed` | **This system with every LLM step removed.** It runs the real `run_model_trainer` and `run_evaluator` nodes with the fixed plan the trainer uses by default (lightgbm, xgboost, random_forest; primary metric AUC). There is no generated feature engineering; the input is the raw CSV. The three candidates have the project's **hand-set** hyperparameters (GBMs: 300 trees, lr 0.05, depth 6, subsampling; RF: 200 trees, depth 10, min_samples_leaf 5) — nothing is tuned — and binary tasks get imbalance weighting (`scale_pos_weight` = majority/minority for the GBMs, `class_weight="balanced"` for RF). The winner is chosen on 5-fold CV AUC on the training split. The trainer fits the 3 candidates **in parallel threads**. |
+| `sys_fixed` | **This system with every LLM step removed.** It runs the real `run_model_trainer` and `run_evaluator` nodes with the fixed plan the trainer uses by default (lightgbm, xgboost, random_forest; primary metric AUC). There is no generated feature engineering; the input is the raw CSV. The three candidates have the project's **hand-set** hyperparameters (GBMs: 300 trees, lr 0.05, depth 6, subsampling; RF: 200 trees, depth 10, min_samples_leaf 5) — nothing is tuned — and binary tasks get imbalance weighting (`scale_pos_weight` = majority/minority for the GBMs, `class_weight="balanced"` for RF), **computed from the full label column before the train/test split** (see "Test-set-dependent choices" below). The winner is chosen on 5-fold CV AUC on the training split. The trainer fits the 3 candidates **in parallel threads**. |
 | `sys_llm` | **The full agent graph with a real LLM**: orchestrator → data analyst → feature engineer (LLM-written script, run in a stripped-env throwaway dir, up to 3 self-correction attempts) → trainer → evaluator. LLM: `qwen2.5:7b` (Ollama tag, digest `845dbda0ea48`, Q4_K_M) for both planner and codegen, through the local Ollama 0.34.4 server at `:11434`, one request at a time. Settings: native `/api/chat`, `num_ctx=8192`, planner temperature 0, codegen temperature 0.1, `seed=0`, `num_predict ≤ 4096`. |
 
 In the system arms, MLflow logging, SHAP plotting and the evaluator's
 justification LLM call are patched out. None of them affects the model, the
 selection or the score. SHAP does not run in this environment anyway (Numba
 does not support NumPy 2.5).
+
+**Test-set-dependent choices (disclosure).** One decision in the system arms is
+made from data that includes the test rows: `run_model_trainer`
+(`agents/model_trainer.py:439-446`) computes the imbalance weight from the whole
+label column, and only splits at line 452-455. So the GBMs' `scale_pos_weight`
+and the RF's `class_weight` reflect class proportions that include the test
+labels, while the `logreg`/`lgbm`/`xgb` baselines get no weighting at all. The
+split is stratified, so the quantity barely moves — over the 11 binary datasets
+× 3 seeds the weight differs from its train-only value by at most 0.063 (on a
+weight of 10.7, i.e. 0.6%) — but it is still a real test-set-touching decision
+and was previously undisclosed.
+
+Measured, not argued: the `sys_fixed_trainw` arm
+(`results/runs_sys_fixed_trainw.jsonl`) is identical to `sys_fixed` except that
+the weight comes from the training split only. **It does not move the number:**
+36 of 45 runs are bit-identical, the largest single-run difference is 0.0078
+AUC, and over datasets the mean difference is +0.0001 AUC (95% CI
+[−0.0004, +0.0006], Wilcoxon p = 0.5, 4 up / 1 down / 10 unchanged). The
+reported `sys_fixed` numbers are therefore not an artefact of this choice. The
+product itself is unchanged (fixing it would alter the reported numbers for no
+measurable gain); it is listed under "Proposed, not done".
+
+Nothing else in the training path depends on the test rows: the preprocessor
+selects columns by dtype only, and every transformer is re-fit inside each CV
+fold and on the training split. The one remaining channel is the LLM arm's
+generated feature-engineering script, which runs on the full CSV before the
+split (section 2b threats).
 
 **Environment.** Windows 11, Python 3.12.3 (Anaconda base) plus a scratch venv
 with `--system-site-packages` that adds FLAML and openml. Versions: sklearn
@@ -119,6 +147,8 @@ python eval_sop/fetch_datasets.py --robustness
 python -m eval_sop.bench --datasets-meta datasets_robustness.json --arms logreg lgbm xgb sys_fixed --seeds 0 1 2 --out eval_sop/results/robustness/runs_simple_fixed.jsonl
 python -m eval_sop.bench --datasets-meta datasets_robustness.json --arms flaml --flaml-budget 11 --flaml-arm-name flaml11 --seeds 0 1 2 --out eval_sop/results/robustness/runs_flaml11.jsonl
 python -m eval_sop.analyze eval_sop/results/robustness
+# sensitivity: imbalance weight from the training split only (item 1)
+python -m eval_sop.bench --arms sys_fixed_trainw --seeds 0 1 2 --out eval_sop/results/runs_sys_fixed_trainw.jsonl
 ```
 Raw per-run records (one JSON object per arm × dataset × seed, including the
 CV scores of every candidate, the winner, wall time and versions) are in
@@ -163,6 +193,11 @@ Cells show the per-dataset mean ± std over the 3 seeds of test ROC AUC.
 | failed runs | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 | 0/45 |
 | median wall time / run | 0.03 s | 0.12 s | 0.11 s | 11.2 s | 60.3 s | 11.1 s |
 
+All bootstrap CIs in this document are percentile CIs of a mean over datasets
+with no multiplicity correction, so they are not significance tests and are not
+comparable with the Holm-adjusted p-values beside them. Where the two disagree,
+the corrected test is the claim.
+
 Paired comparisons use per-dataset means, so the unit is the dataset (n = 15).
 Each row reports a two-sided Wilcoxon signed-rank test, a percentile bootstrap
 95% CI of the mean difference (10,000 resamples of datasets), and a Holm
@@ -178,17 +213,43 @@ correction over the 6 comparisons. No run failed, so "failures imputed" equals
 | sys_fixed − logreg | +0.0032 | [−0.0060, +0.0132] | 7/8 | 0.804 | 1.0 |
 | flaml (60 s) − lgbm | +0.0076 | [−0.0007, +0.0168] | 9/6 | 0.229 | 0.69 |
 
-`summary.md` also shows ranks among all 7 arms including `sys_llm`
-(slightly different numbers; lgbm and xgb tie there).
+`summary.md` reports ranks over all 8 arms it knows about (adding `sys_llm` and
+the `sys_fixed_trainw` sensitivity arm) and, separately, over the non-LLM arms;
+those numbers differ from this table because the arm set differs. The 6-arm
+ranks in this table are the ones the text above refers to.
 
 `sys_fixed` chose random_forest 26 times, xgboost 12 times and lightgbm 7 times
-out of 45 runs. **XGBoost failed to train on 5 of the 15 datasets**
-(blood-transfusion, ilpd, qsar-biodeg, wdbc, cmc; every seed) because those
-targets are numerically coded 1/2 (or 1/2/3) and the trainer only
-label-encodes *string* targets; XGBoost requires 0..K−1. On those datasets
-`sys_fixed` chose between 2 candidates, not 3. This is a product bug found by
-the benchmark; it is not fixed here (fixing it changes reported numbers and
-would need a re-run). See "Proposed, not done".
+out of 45 runs.
+
+**A product bug silently removed one candidate (both datasets sets, and the LLM
+arm).** The trainer label-encodes only *string* targets, so a target coded 1/2
+(or 1/2/3) reaches XGBoost, which requires 0..K−1, and that candidate errors
+with "Invalid classes inferred from unique values of `y`". The run still
+*succeeds* with the remaining candidates, so this never showed up as a failure:
+
+| set / arm | XGBoost candidate errored on | runs |
+|---|---|---|
+| main, `sys_fixed` | blood-transfusion, ilpd, qsar-biodeg, wdbc, cmc (5/15 datasets) | 15/45 |
+| robustness, `sys_fixed` | dresses-sales, banknote-authentication, mfeat-morphological, mfeat-zernike (4/16) | 12/48 |
+| main, `sys_llm` | blood-transfusion (1/15, all 3 seeds) | 3/45 |
+
+On those datasets the system chose among 2 candidates, not 3. `summary.md` now
+carries this as its own row ("candidate models that errored inside completed
+runs"), computed from the raw records rather than asserted here.
+
+*Does the bug manufacture the LightGBM win?* No — splitting the main set on it
+goes the other way: on the 10 datasets where all 3 candidates trained,
+`sys_fixed − lgbm` = **+0.0087** (Wilcoxon p = 0.020, 9 up / 1 down); on the 5
+affected datasets **+0.0131** (p = 0.312, 3/2). Same sign, and cleaner on the
+unaffected subset. But n = 10 would give Holm p ≈ 0.12, so the headline
+"Holm p = 0.040" does depend on all 15 datasets, and a re-run with the bug
+fixed could plausibly land either side of 0.05. That is one reason the effect
+is reported as a point estimate rather than a significant result. It is not
+fixed here: fixing it changes every reported `sys_fixed` number and needs a
+full re-run. See "Proposed, not done".
+
+Incidentally, both sets are affected at a similar rate (5/15 and 4/16), so this
+bug does **not** explain the non-replication in section 2c.
 
 ### What the numbers do and don't support
 
@@ -201,11 +262,14 @@ would need a re-run). See "Proposed, not done".
   did **not** replicate on the robustness set (+0.003, Holm p = 0.41).
 - The same pipeline beat default XGBoost by +0.012 AUC, but that does not
   survive Holm correction (Holm p = 0.062).
-- The fixed pipeline is **not significantly different** from FLAML at a
-  ~11 s wall-time budget (+0.007, Holm p = 0.43; note the bootstrap CI
-  [+0.0013, +0.0128] excludes zero, so this is underpowered rather than a
-  demonstrated tie), from FLAML at 60 s, or from plain logistic regression.
-  On these small tabular datasets, logistic regression is a strong baseline.
+- The fixed pipeline is **not significantly different** from FLAML at a nominal
+  ~11 s budget (+0.007, Wilcoxon p = 0.107, Holm p = 0.43). The bootstrap CI
+  [+0.0013, +0.0128] excludes zero, but with n = 15 a percentile bootstrap of a
+  mean is anti-conservative and is not multiplicity-corrected, so it is **not**
+  evidence against the test; the honest reading is that this comparison is
+  underpowered and no difference was established. The same holds against FLAML
+  at 60 s and against plain logistic regression. On these small tabular
+  datasets, logistic regression is a strong baseline.
 - The pipeline is reliable on this suite: 0/45 failures, and results are
   bit-for-bit reproducible.
 
@@ -225,14 +289,19 @@ would need a re-run). See "Proposed, not done".
 - **Single holdout per seed.** Per-dataset std is large on the smallest
   datasets (credit-g, blood-transfusion, ilpd: ±0.03–0.07), larger than most
   between-arm differences.
-- **Budget and compute asymmetry.** `sys_fixed` is not time-budgeted; it
-  trains a fixed 3-model × 5-fold set, **in 3 parallel threads**, while FLAML
-  ran with `n_jobs=1`. So "equal ~11 s" is equal wall time, not equal compute:
-  `sys_fixed` had up to ~3 cores. `flaml11` also matches only the *median*
-  time; per dataset the times differ, and FLAML sometimes overran its budget
-  on the loaded machine. The default-GBM baselines get far less compute than
-  `sys_fixed`. Much of the "+0.010 over LightGBM" is "more models, imbalance
-  weighting and CV selection".
+- **Compute was not equalised, in either direction.** Treat `flaml11` as "a
+  FLAML run of roughly comparable order of magnitude", never as equal budget.
+  `sys_fixed` is not time-budgeted at all: it trains a fixed 3-model × 5-fold
+  set **in 3 parallel threads** (up to ~3 cores), bounded at 23.2 s (main set)
+  and 58.8 s (robustness set). FLAML ran with `n_jobs=1` (1 core) and does not
+  honour its nominal budget: on the main set its median was 11.2 s but 12 of 45
+  runs exceeded 15 s and the slowest took **117.4 s** (10× nominal); on the
+  robustness set the median was 23.2 s and the slowest **1,109 s** (100×
+  nominal). The direction of this error favours the system: FLAML usually had
+  *more* wall time than `sys_fixed` and still came out +0.007 behind on the
+  main set. The default-GBM baselines get far less compute than `sys_fixed`.
+  Much of the "+0.010 over LightGBM" is "more models, imbalance weighting and
+  CV selection".
 - **Shared machine.** Each library call was capped at 1 thread (see Setup).
   Wall times are from a loaded laptop and are only comparable within this run.
 - **Library versions** are newer than the repo pins (see Setup). The system was
@@ -247,33 +316,40 @@ would need a re-run). See "Proposed, not done".
   no arm here selects on test.
 
 
-## 2c. Robustness set: the 15 excluded CC18 datasets with ≤60 features
+## 2c. Robustness set: the 16 excluded CC18 datasets with ≤60 features
 
-Added at the reviewer's request after the main results. The same harness,
-3 seeds, no LLM, arms logreg / lgbm / xgb / flaml11 / sys_fixed
-(`results/robustness/`). Datasets: dresses-sales, kc2, cylinder-bands,
-balance-scale, analcatdata_dmft, tic-tac-toe, vowel, pc1,
-banknote-authentication, pc4, pc3, car, mfeat-morphological, mfeat-zernike,
-segment. 0 failures in any arm.
+Added at a reviewer's request after the main results, to test the main-set
+conclusion on data that played no part in choosing the main 15. Every CC18
+dataset that passes the main set's own filter (500–3,200 rows, ≤60 features)
+and is not in the main set: dresses-sales, kc2, cylinder-bands, balance-scale,
+analcatdata_dmft, tic-tac-toe, vowel, pc1, banknote-authentication, pc4, pc3,
+car, mfeat-morphological, mfeat-zernike, segment, splice. Same harness, 3 seeds,
+no LLM (`results/robustness/`). `splice` has exactly 60 features and was missed
+when this list was first written (commit `29b0f20` ran 15 datasets); a review
+caught it and it was added, so the numbers below supersede that commit's.
+0 run-level failures in any arm — but see the XGBoost candidate bug above,
+which silently cost `sys_fixed` a candidate on 4 of these 16 datasets.
 
 | | logreg | lgbm | xgb | flaml11 | sys_fixed |
 |---|---|---|---|---|---|
-| mean AUC | 0.8771 | 0.8907 | 0.8860 | 0.8928 | 0.8941 |
-| average rank (5 arms) | 3.47 | 3.17 | 3.83 | 2.40 | 2.13 |
-| median wall time / run | 0.0 s | 0.2 s | 0.1 s | 22.2 s | 10.6 s |
+| mean AUC | 0.8842 | 0.8973 | 0.8929 | 0.8992 | 0.9004 |
+| average rank (5 arms) | 3.56 | 3.09 | 3.66 | 2.50 | 2.19 |
+| median (max) wall time / run | 0.1 s | 0.2 s | 0.2 s | 23.2 s (1,109 s) | 11.0 s (58.8 s) |
 
 | comparison | mean ΔAUC | 95% CI | W/L | Wilcoxon p | Holm p (4 tests) |
 |---|---|---|---|---|---|
-| sys_fixed − lgbm | +0.0034 | [−0.0024, +0.0093] | 12/3 | 0.135 | 0.41 |
-| sys_fixed − xgb | +0.0080 | [+0.0014, +0.0157] | 13/2 | 0.015 | 0.060 |
-| sys_fixed − flaml11 | +0.0013 | [−0.0074, +0.0102] | 8/7 | 0.89 | 0.89 |
-| sys_fixed − logreg | +0.0170 | [−0.0036, +0.0411] | 10/5 | 0.21 | 0.42 |
+| sys_fixed − lgbm | +0.0032 | [−0.0022, +0.0087] | 12/4 | 0.130 | 0.39 |
+| sys_fixed − xgb | +0.0075 | [+0.0014, +0.0149] | 13/3 | 0.018 | 0.073 |
+| sys_fixed − flaml11 | +0.0013 | [−0.0071, +0.0095] | 9/7 | 0.821 | 0.82 |
+| sys_fixed − logreg | +0.0162 | [−0.0036, +0.0387] | 11/5 | 0.175 | 0.39 |
 
-Reading: on these datasets no comparison survives Holm correction. The
-point estimates keep the same sign as in the main set, but the one
-significant main-set result (vs LightGBM) does not replicate. FLAML-11 s
-overran its budget here (median 22 s), so it had more wall time than
-`sys_fixed`.
+Reading: no comparison here survives Holm correction. The point estimates keep
+the same sign as in the main set, but the one main-set result that did survive
+correction (vs LightGBM) does not replicate: +0.010 → +0.003. The honest summary
+of both sets together is a small positive effect of the configured-candidates +
+CV-selection stage over a single default GBM, of a size these 31 datasets cannot
+resolve from zero. FLAML again ignored its nominal 11 s budget here (median
+23.2 s, max 1,109 s), so it had *more* wall time than `sys_fixed`.
 
 ## 2b. LLM arm (`sys_llm`) and leakage audit
 
@@ -406,6 +482,16 @@ Limits of the audit:
   cache).
 - **Sandbox timeout.** It is the system default, 120 s; one failure (diabetes)
   was a timeout.
+- **The generated preprocessing saw the test rows.** The feature-engineering
+  script runs on the **full CSV, before** `train_test_split`, so every
+  `sys_llm` test AUC above comes from a pipeline whose preprocessing step had
+  access to the test rows. Any cross-row statistic the script computes (a
+  constant-column drop decided on all rows, a global mean) is therefore fitted
+  on train+test. This is a property of the product's design, not of the
+  harness; moving the step after the split is listed under "Proposed, not
+  done". The leakage audit (above) is the mitigation and found 0/9 scripts
+  affected, but it can only audit scripts that ran and its 95% upper bound on
+  the leakage rate is 34% — so "no leakage was detected", not "there was none".
 - **System differences.** `sys_llm` trains whatever the planner chose (4–5
   models including `mlp`); `sys_fixed` trains 3. So the comparison is
   "LLM pipeline vs fixed pipeline", not "feature engineering on vs off" in
@@ -438,7 +524,8 @@ logical change at a time (`repro/build_commits.py`, `repro/stage_tests.sh`).
 | 9 | `6593f43` | `_select_winner` ranks the models with a valid CV score by CV; models whose CV failed rank after them; holdout is used only if no model has a valid CV score. `selection_basis` follows. | Review: `use_cv = all(...)` meant one failed CV sent every model to test-set selection. New test failed on `30276d0`. Did not occur in the benchmark: 63/63 completed system runs had `selection_basis=cv`. | LLM-free deterministic selection and docstring rationale kept. |
 | — | `cbd72a3` | Test only: the env-isolation test's last assert compared stdout with an unrelated `tmp_path` and could never fail; it now checks the leaked-key list is empty and the cwd was a removed `amlpb_exec_*` dir. | Review finding. The strengthened test fails on the pre-`1ff217b` tree (keys listed). | — |
 | — | `450727a` | `repro/build_commits.py` and `repro/stage_tests.sh` no longer hard-code user/scratchpad paths (git revisions and env vars instead). Rerun: rebuilds commits 1–6 with no mismatch against `ba83f3a`. | Review finding. | — |
-| — | `e8e348b` | Username/home paths scrubbed from stage logs, repro outputs, `runs_sys_llm.jsonl`, `llm_cache.jsonl`. | Review finding. Side effect on cache replay noted in Setup. | All JSONL still parses. |
+| — | `e8e348b` | Username/home paths scrubbed from stage logs, repro outputs, `runs_sys_llm.jsonl`, `llm_cache.jsonl`. **Tip-only:** history was deliberately not rewritten, so 8 earlier commits on this branch (`5046138`, `d02acc5`, `a2deaf0`, `ba17f4a`, `30276d0`, `6593f43`, `cbd72a3`, `450727a`) still contain `C:\Users\<name>\...` in 17–19 files each. **The branch must be squashed or filtered before it is published.** Verified: no key material anywhere in the branch history (the only key-shaped strings are the repo's pre-existing `.env.example` placeholders). | Review finding. Side effect on cache replay noted in Setup. | All JSONL still parses; history untouched. |
+| — | (this round) | Harness + RESULTS only, no product code. (a) `sys_fixed_trainw` sensitivity arm measures the train-only imbalance weight (item 1); (b) `summary.md` gains a candidate-model-failure row, so the XGBoost bug is visible in generated output (item 2); (c) `splice` added to the robustness set and `cc18_candidates.json` commits rows/features/classes for all 42 row-filter candidates, making the ≤60-feature filter mechanically checkable (items 2, 7); (d) wording fixes for the FLAML budget, the bootstrap CIs, the LLM feature-engineering channel, the tip-only scrub and SOP 2–3 (items 3, 4, 5, 6). | Round-2 review. Each claim re-verified against the raw records before the wording changed. | All earlier numbers kept; the 2c table is restated on 16 datasets and the old 15-dataset figures are called out as superseded. |
 | — | `29b0f20` | Robustness set (2c) + harness options (`--datasets-meta`, `fetch_datasets.py --robustness`, `analyze.py <dir>`), labelled rank rows in `summary.md`. | Review item 7/8. | Main-set numbers unchanged. |
 | — | `d02acc5` | Harness only, no product code. (a) `eval_sop/llm.py` can call Ollama's native `/api/chat` with `num_ctx` (needed for the ≤8192 context constraint; the OpenAI-compatible endpoint cannot set it). (b) `analyze.py` reports the three failure treatments, with Holm within two pre-declared families (LLM comparisons; non-LLM comparisons). (c) `leakage_audit_controls.py` adds positive and negative controls. The LLM arm and audit outputs are committed. | Required by the run constraints and the reporting request. | Non-LLM Holm values are unchanged (same 6-test family). |
 
@@ -459,8 +546,15 @@ scripts that ran, but nothing in the product checks this at run time. See
 ## 4. Proposed, not done
 
 - **Label-encode every classification target** (not only strings) so XGBoost
-  works on 1/2-coded targets. It failed on 5/15 main datasets (section 2).
-  Not done: it changes the reported `sys_fixed` numbers and needs a re-run.
+  works on 1/2-coded targets. Its candidate errored on 5/16 main and 4/16
+  robustness datasets (section 2). Not done: it changes every reported
+  `sys_fixed` number and needs a full re-run.
+- **Compute the imbalance weight from the training split only.** The product
+  derives it from the full label column before splitting
+  (`agents/model_trainer.py:439-455`). Measured here as worth +0.0001 AUC
+  (Setup, "Test-set-dependent choices"), so this is a correctness/hygiene fix
+  rather than a numbers fix. Not done: it would change the reported numbers for
+  no measurable gain, and the honest disclosure costs nothing.
 - **Send the tail of the traceback to self-correction**, not `error[:1500]`
   (the head); 3/16 fix prompts lost the exception line (section 2b).
 
@@ -524,14 +618,18 @@ measured.
    API keys from the environment. I fixed each in its own commit, with a test
    that fails before the fix; a sixth defect (leakage warnings are never
    computed) is still open."
-2. "On 15 OpenML-CC18 datasets × 3 seeds, the system's LLM-free stage (three
-   hand-configured models plus cross-validated selection) beat a default
-   LightGBM by +0.010 ROC AUC (Holm p = 0.04) and was not significantly
-   different from FLAML at a similar wall-clock budget (Holm p = 0.43); on 15
-   further CC18 datasets the LightGBM gain shrank to +0.003 and was not
-   significant."
+2. "On 15 OpenML-CC18 datasets × 3 seeds, the system's LLM-free stage (up to
+   three hand-configured models plus cross-validated selection — only two
+   trained on 5 of the 15 datasets, where a target-encoding bug broke XGBoost)
+   beat a default LightGBM by +0.010 ROC AUC; on 16 further CC18 datasets the
+   gain shrank to +0.003 and was not significant, so I report the effect as a
+   non-replicating point estimate rather than a result. Against FLAML at a
+   nominal 11 s budget that FLAML frequently overran (median 11.2 s, max 117 s)
+   the difference was +0.007 and not significant after correction; the compute
+   was not equalised in either direction."
 3. "Ablating the LLM agents showed they did not pay off with a local 7B model:
    generated preprocessing code broke 9 of 15 datasets, and on the 6 that
    completed AUC was no better than the LLM-free pipeline (Δ = −0.012, n.s.);
    a leakage audit with positive controls found no leakage in the 9 generated
-   scripts that ran."
+   scripts that ran, but it could only audit scripts that ran and its 95% upper
+   bound on the leakage rate is 34%."
