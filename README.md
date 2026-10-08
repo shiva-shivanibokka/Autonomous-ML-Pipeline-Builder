@@ -8,6 +8,8 @@
 ![License](https://img.shields.io/badge/license-MIT-blue)
 [![Live console](https://img.shields.io/badge/live-console%20replay-35d0ba)](https://autonomous-ml-pipeline-builder.vercel.app)
 
+> **Measured evaluation: [`RESULTS.md`](RESULTS.md)** — a **negative result**: with a local 7B model the agent pipeline failed outright on 9 of 15 datasets, and on the 6 that completed it was no better than the same pipeline with the LLM steps removed (Δ = −0.012 AUC, Holm p = 0.47).
+
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
 > - **Hardest problem solved:** eliminating train/test **data leakage** across the whole flow (preprocessing is a scikit-learn `Pipeline` fit on the training fold only) *and* shipping a **runnable** artifact — the full pipeline serializes to `model.pkl`, so the generated FastAPI service predicts on raw input with zero training/serving skew.
