@@ -545,6 +545,52 @@ scripts that ran, but nothing in the product checks this at run time. See
 
 **Documentation-only round (2026-10-04): commit hashes re-pointed after the history rewrite, privacy position corrected.** The `filter-branch` rewrite changed every commit SHA on `sop-eval` while preserving the final tree, so ten short hashes cited in this file pointed at objects no longer reachable from HEAD. Re-pointed by matching commit subjects: `5046138`→`3093c1e`, `d02acc5`→`dff01b3`, `a2deaf0`→`72409b5`, `ba17f4a`→`df4be10`, `30276d0`→`e200b7c`, `6593f43`→`58ecb89`, `cbd72a3`→`e553d61`, `450727a`→`86635d5`, `e8e348b`→`ed021eb`, `29b0f20`→`d3af594`. Already reachable and left alone: `8987d6f`, `a50e055`, `6343b1c`, `df2de5f`, `1ff217b`, `322dd9c`, `ba83f3a`. Every replacement passes both `git cat-file -e <new>^{commit}` and `git merge-base --is-ancestor <new> HEAD`. The `ed021eb` row's privacy paragraph was rewritten to state only what was verified commit-by-commit, including the one residual (`stage_tests.sh` in 7 pre-`86635d5` commits). No code, no result file and no number changed.
 
+## 3b. A test that only passed on the wrong version of langgraph
+
+Found on 2026-10-08, after the pull request opened and CI ran the branch for the
+first time on a clean machine.
+
+Two of the nine tests in `tests/test_graph_e2e.py` failed in CI while passing
+locally:
+
+```
+langgraph.errors.InvalidUpdateError: Must write to at least one of
+['csv_path', 'business_problem', ... 'logs']
+```
+
+The cause was in the test, not the project. `_run_graph` stubs out the code
+generation and deployment nodes, which these tests are not about, and the stub
+was the obvious `lambda state: {}`. langgraph **1.1.6** accepts a node that
+returns an empty update; langgraph **0.1.5** raises. `requirements.txt` pins
+`langgraph==0.1.5`, which is what CI and the Docker image install. This
+machine's ambient Anaconda carries 1.1.6, so the tests were written, run and
+declared passing against a version this project does not declare.
+
+Fixed by giving the stub a real but inert write, `{"logs": state["logs"]}` --
+inert because `logs` is a plain `list[str]` in `agents/state.py` with no reducer,
+so langgraph replaces the list with the same object rather than appending to it.
+
+Reproduced before fixing and counted by reverting, both in a venv built from
+`requirements.txt` at the pin:
+
+| langgraph | stub | result |
+| --- | --- | --- |
+| 0.1.5 (the pin, == CI) | `lambda state: {}` | **2 failed**, 7 passed |
+| 0.1.5 (the pin, == CI) | `{"logs": state["logs"]}` | **9 passed** |
+| 1.1.6 (ambient Anaconda) | `{"logs": state["logs"]}` | **9 passed** |
+
+Full suite at the pin after the fix: **92 passed**, `ruff check .` clean.
+
+**What this is worth saying.** Nothing in the benchmark numbers changes -- these
+two tests assert that the orchestrator's plan reaches the trainer and that the
+orchestrator is shown the real column names, and both facts hold on both
+versions. What changed is the evidence for them. For the life of this branch
+those two tests were passing in an environment the project does not pin, which
+means they were not testing the configuration that ships. A test that passes
+only on an undeclared dependency version is a check that has stopped checking,
+and the only thing that caught it was running the suite somewhere other than the
+machine that wrote it.
+
 ## 4. Proposed, not done
 
 - **Label-encode every classification target** (not only strings) so XGBoost

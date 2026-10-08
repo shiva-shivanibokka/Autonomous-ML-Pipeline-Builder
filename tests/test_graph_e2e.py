@@ -87,6 +87,27 @@ def csv_path(tmp_path):
     return str(p)
 
 
+def _noop_node(state):
+    """A graph node that changes nothing, written so langgraph 0.1.5 accepts it.
+
+    These two nodes (code generation and deployment) are stubbed out because they
+    are not what these tests are about. The obvious stub is `lambda state: {}`,
+    and it works on langgraph 1.1.6 -- which is what this machine's ambient
+    Anaconda happens to carry, so the tests passed locally and failed in CI.
+    `requirements.txt` pins `langgraph==0.1.5`, and 0.1.5 raises
+    `InvalidUpdateError: Must write to at least one of [...]` on an empty update.
+
+    Returning the existing `logs` list is a genuine write and a true no-op:
+    `logs` is a plain `list[str]` in AgentState with no reducer (agents/state.py),
+    so langgraph replaces it with the same object rather than appending.
+
+    The pinned version is the one that counts -- it is what CI and the Docker
+    image install -- so the stub is written for 0.1.5. It is also correct on
+    1.1.6, verified on both.
+    """
+    return {"logs": state["logs"]}
+
+
 def _run_graph(csv_path, tmp_path, fake):
     import pipeline.graph as graph_mod
 
@@ -97,8 +118,8 @@ def _run_graph(csv_path, tmp_path, fake):
     ), patch("agents.model_trainer.log_training_run", return_value=""), patch(
         "agents.model_trainer.log_comparison_table"
     ), patch("sandbox.executor.settings") as s, patch.object(
-        graph_mod, "run_code_generator", lambda state: {}
-    ), patch.object(graph_mod, "run_deployment_agent", lambda state: {}):
+        graph_mod, "run_code_generator", _noop_node
+    ), patch.object(graph_mod, "run_deployment_agent", _noop_node):
         s.execution_backend = "subprocess"
         s.e2b_api_key = ""
         s.allow_local_exec = True
