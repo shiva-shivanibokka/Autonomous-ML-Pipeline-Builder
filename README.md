@@ -202,7 +202,7 @@ curl -O http://localhost:8000/pipeline/<pipeline_id>/artifacts/model.pkl
 
 ```bash
 pip install -r requirements-dev.txt
-ALLOW_LOCAL_EXEC=true pytest -q          # 83 tests (1 skips without the E2B extra)
+ALLOW_LOCAL_EXEC=true pytest -q          # 92 tests (1 skips without the E2B extra)
 ruff check .                             # lint
 ```
 
