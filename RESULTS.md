@@ -594,8 +594,9 @@ machine that wrote it.
 ## 4. Proposed, not done
 
 - **Label-encode every classification target** (not only strings) so XGBoost
-  works on 1/2-coded targets. Its candidate errored on 5/16 main and 4/16
-  robustness datasets (section 2). Not done: it changes every reported
+  works on 1/2-coded targets. Its candidate errored on 5/15 main and 4/16
+  robustness datasets (section 2; the main set has 15 datasets, not 16 — this
+  line read "5/16" until 2026-10-08). Not done: it changes every reported
   `sys_fixed` number and needs a full re-run.
 - **Compute the imbalance weight from the training split only.** The product
   derives it from the full label column before splitting
@@ -628,15 +629,22 @@ machine that wrote it.
 - **`tracemalloc` inside parallel training threads** is process-global (start/stop
   from three threads at once) and adds allocation-tracing overhead to every fit.
   Not measured or changed here.
-- **README corrections** (the README was not edited):
-  - The "What one real run produced" table lists `logistic_regression` among
-    "Models trained & cross-validated". The recorded run log shows only 3
-    models were trained, because of bug 1. The planned metric was `f1`, but the
-    winner was picked on test AUC.
-  - "Winner (chosen by argmax…) AUC 0.836": that argmax was over the **test**
-    set, so 0.836 is an optimistically selected number.
-  - "Leakage-safe" feature engineering is enforced only by the prompt; nothing
-    checks it (B6).
+- **README corrections — APPLIED 2026-10-08.** All three are now in `README.md`:
+  - The "What one real run produced" row no longer lists `logistic_regression`
+    among the models trained. It says three were trained, not four, and names
+    the cause (LangGraph dropping the orchestrator plan, since fixed in
+    `a50e055`) and that the planned metric was `f1` while the winner was picked
+    on AUC.
+  - The 0.836 row now states that the argmax ran over the **test** set, making
+    it an optimistically selected number, and that the 0.003 gap to the
+    runners-up sits inside selection noise.
+  - The "No data leakage" bullet is now "No leakage in the preprocessing path",
+    and says explicitly that the `Pipeline` guarantee is structural and cannot
+    catch a leaky engineered feature.
+  - Added beyond the three: a "Known defects, reproduced and still present"
+    section carrying B6 (`leakage_warnings` hard-coded to `[]` at
+    `agents/feature_engineer.py:172`) and the XGBoost 1/2-coded-target bug with
+    its measured counts, together with the reason the XGBoost fix is deferred.
 
 ## 5. LLM arm: how it was run, and the paid run not done
 

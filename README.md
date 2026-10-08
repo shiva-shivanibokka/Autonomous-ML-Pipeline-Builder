@@ -27,13 +27,38 @@ Telco customer churn, 7,043 rows × 21 columns, `claude-sonnet-5`, ~2 minutes en
 
 | | |
 |---|---|
-| Models trained & cross-validated | `lightgbm`, `xgboost`, `random_forest`, `logistic_regression` |
-| Winner (chosen by argmax, not by asking the model) | **`random_forest`** — AUC **0.836** vs xgboost 0.8328, lightgbm 0.8322 |
+| Models actually trained | `lightgbm`, `xgboost`, `random_forest` — **three, not four.** The run log shows `logistic_regression` was *planned* and never trained; LangGraph was dropping the orchestrator's plan before the trainer read it (since fixed, commit `a50e055`) |
+| Winner | **`random_forest`** — AUC **0.836** vs xgboost 0.8328, lightgbm 0.8322. **Read this as an optimistically selected number:** the argmax ran over the *test* set, so the gap to the runners-up (0.003) is well inside selection noise. The planned metric was `f1`; the winner was picked on AUC |
 | Fairness | flagged `gender` as a sensitive feature before deployment |
 | Emitted | `model.pkl`, `pipeline.py`, `fastapi_endpoint.py`, `Dockerfile`, `requirements.txt`, `openapi_spec.json`, `feature_schema.json`, SHAP plot |
 | Verified after the fact | `model.pkl` loads as `Pipeline(['prep','model'])` and predicts on **raw, untouched CSV rows** — no manual preprocessing, no training/serving skew |
 
 The self-correction loop earned its keep in that run: the Feature Engineer's first sandboxed attempt failed, the traceback went back to the model, and the retry succeeded. It's in the log stream.
+
+### Known defects, reproduced and still present
+
+Both are measured in [`RESULTS.md`](RESULTS.md) and neither is fixed. They are
+here rather than only in the evaluation because each one affects what this
+project claims to do.
+
+- **Nothing checks for leakage at run time.** `leakage_warnings` is hard-coded
+  to `[]`, so the field a reader would take as a leakage audit is always empty
+  regardless of what the Feature Engineer produced. "Leakage-safe feature
+  engineering" is enforced *only by the prompt*. The scikit-learn `Pipeline`
+  guarantee above is real and separate: it prevents preprocessing from seeing
+  the test fold, but it cannot catch a leaky engineered feature.
+- **The XGBoost candidate silently disappears on 1/2-coded targets.** The
+  trainer label-encodes only *string* targets, so a target coded 1/2 (or
+  1/2/3) reaches XGBoost, which needs `0..K−1`, and that candidate errors with
+  "Invalid classes inferred from unique values of `y`". **The run still reports
+  success**, having chosen among 2 candidates instead of 3. Measured: it
+  errored on **5 of 15** main datasets and **4 of 16** robustness datasets
+  (and 1 of 15 in the LLM arm).
+
+The XGBoost fix is deliberately deferred: label-encoding every target changes
+every reported `sys_fixed` number and needs a full re-run, so it is stated here
+rather than half-applied. `RESULTS.md` also shows the bug does **not**
+manufacture the LightGBM win.
 
 ---
 
@@ -41,7 +66,7 @@ The self-correction loop earned its keep in that run: the Feature Engineer's fir
 
 Most early-career ML projects are a notebook with a model that was never deployed and quietly leaks test data into training. This one is built the other way around:
 
-- **No data leakage.** Preprocessing is a scikit-learn `Pipeline` fit on the training fold only, validated with k-fold cross-validation. ([ADR 0002](docs/adr/0002-leakage-safe-pipeline.md))
+- **No leakage in the preprocessing path.** Preprocessing is a scikit-learn `Pipeline` fit on the training fold only, validated with k-fold cross-validation. ([ADR 0002](docs/adr/0002-leakage-safe-pipeline.md)) **This is a structural guarantee about the pipeline, not a leakage check on the generated features** — see the known defects below, where "leakage-safe feature engineering" is enforced only by the prompt and `leakage_warnings` is hard-coded empty.
 - **The output actually runs.** The winning pipeline (preprocessing + model) is serialized to `model.pkl`; the generated FastAPI service loads it and predicts on raw input — no training/serving skew.
 - **Built to deploy properly.** Non-root container for Cloud Run — built and smoke-imported in CI on every push — static frontend for Vercel, secrets via Secret Manager, health checks, structured logs, and a Prometheus `/metrics` endpoint.
 - **Retrieval-grounded agents.** The code-generating agents retrieve from a curated ML best-practices knowledge base (RAG) instead of relying on parametric memory alone.
