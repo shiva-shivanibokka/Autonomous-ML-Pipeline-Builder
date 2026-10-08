@@ -1,0 +1,1440 @@
+{
+  "n_datasets": 15,
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "arms": [
+    "logreg",
+    "lgbm",
+    "xgb",
+    "flaml11",
+    "flaml",
+    "sys_fixed",
+    "sys_fixed_trainw",
+    "sys_llm"
+  ],
+  "per_dataset": [
+    {
+      "openml_id": 3,
+      "dataset": "kr-vs-kp",
+      "logreg": {
+        "mean": 0.9948697376488852,
+        "std": 0.002096691925347352,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9997977900408334,
+        "std": 0.00016671725723894245,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9998630190599194,
+        "std": 0.00015746425716639997,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9997651755312904,
+        "std": 0.0002690252257223632,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9998369274522849,
+        "std": 0.0001370973709900031,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9998956335694623,
+        "std": 0.00010041879847069229,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9998956335694623,
+        "std": 0.00010041879847069229,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 15,
+      "dataset": "breast-w",
+      "logreg": {
+        "mean": 0.9953200483091789,
+        "std": 0.005566846034870829,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.986941425120773,
+        "std": 0.0069218447901522205,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.987469806763285,
+        "std": 0.006148977009183667,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9921120169082126,
+        "std": 0.007053025546218888,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9910175120772946,
+        "std": 0.005853104177558712,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9885265700483092,
+        "std": 0.006892147786028695,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9888285024154589,
+        "std": 0.008134331991876903,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9854317632850242,
+        "std": 0.01152520774475783,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    },
+    {
+      "openml_id": 23,
+      "dataset": "cmc",
+      "logreg": {
+        "mean": 0.695136405447332,
+        "std": 0.02853137599362177,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.7011210997556709,
+        "std": 0.024315678509635928,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.7017476303456284,
+        "std": 0.020580050540133708,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.7458418972069878,
+        "std": 0.035813900848841625,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.7412851014754978,
+        "std": 0.04018539559457606,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.739588727464423,
+        "std": 0.030093058746298987,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.739588727464423,
+        "std": 0.030093058746298987,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 29,
+      "dataset": "credit-approval",
+      "logreg": {
+        "mean": 0.9434390745866156,
+        "std": 0.0020235011609372622,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9395358739621035,
+        "std": 0.018349126188132996,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9371229863033141,
+        "std": 0.023380785385985956,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9448229366262152,
+        "std": 0.0211979942796047,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9467390532964304,
+        "std": 0.019797105867730813,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9492583918813425,
+        "std": 0.02237529929621866,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9496132283017529,
+        "std": 0.022084740590932038,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 31,
+      "dataset": "credit-g",
+      "logreg": {
+        "mean": 0.7786111111111111,
+        "std": 0.06453493724698586,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.7840079365079365,
+        "std": 0.04456538250947897,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.7966269841269842,
+        "std": 0.05765572589645382,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.7675396825396826,
+        "std": 0.06788557605360665,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.7732142857142857,
+        "std": 0.07300182102534068,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.7929365079365079,
+        "std": 0.06997188588865402,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.7929365079365079,
+        "std": 0.06997188588865402,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.7937301587301588,
+        "std": 0.06383998177368704,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    },
+    {
+      "openml_id": 37,
+      "dataset": "diabetes",
+      "logreg": {
+        "mean": 0.8306790123456791,
+        "std": 0.047369897390470685,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.804753086419753,
+        "std": 0.02936474966845436,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.7935802469135802,
+        "std": 0.03181809868218759,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.8202469135802469,
+        "std": 0.03134014205275085,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.836327160493827,
+        "std": 0.017078334944096076,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.829074074074074,
+        "std": 0.03324112761561723,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.829074074074074,
+        "std": 0.03324112761561723,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 54,
+      "dataset": "vehicle",
+      "logreg": {
+        "mean": 0.9482282965876716,
+        "std": 0.004939273695330579,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9299829322876199,
+        "std": 0.005729492076943749,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9310338518541643,
+        "std": 0.011652117455095983,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9336637321012321,
+        "std": 0.0027121103607906875,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9283263755920007,
+        "std": 0.013524132775774219,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9328427345224221,
+        "std": 0.004497353911621366,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9328427345224221,
+        "std": 0.004497353911621366,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 188,
+      "dataset": "eucalyptus",
+      "logreg": {
+        "mean": 0.9169518783757322,
+        "std": 0.011457623020766956,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.904634624949927,
+        "std": 0.004776128442563345,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9060634218340239,
+        "std": 0.008037007213318202,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9144358443959227,
+        "std": 0.00847993724395266,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9144358443959227,
+        "std": 0.00847993724395266,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9139472279457094,
+        "std": 0.011056471908834012,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9139472279457094,
+        "std": 0.011056471908834012,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9137125582634722,
+        "std": 0.010523791716455176,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    },
+    {
+      "openml_id": 1067,
+      "dataset": "kc1",
+      "logreg": {
+        "mean": 0.8074193780076134,
+        "std": 0.0048903012339975675,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.800854700854701,
+        "std": 0.013051312808480818,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.8070028011204483,
+        "std": 0.01928442025592727,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.8178266178266179,
+        "std": 0.007191379096417495,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.8465991524815054,
+        "std": 0.014958707826406492,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.8335631688572867,
+        "std": 0.004638197781006676,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.8335631688572867,
+        "std": 0.004638197781006676,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 1464,
+      "dataset": "blood-transfusion",
+      "logreg": {
+        "mean": 0.7515025990903182,
+        "std": 0.03207277819013823,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.7071150097465887,
+        "std": 0.051295329591519744,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.7015107212475633,
+        "std": 0.031214772254868434,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.6993583495776479,
+        "std": 0.03303304917082324,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.705003248862898,
+        "std": 0.041846769804206256,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.7243339831059129,
+        "std": 0.05093952580872189,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.7243339831059129,
+        "std": 0.05093952580872189,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.6632959714100064,
+        "std": 0.08302142995622369,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    },
+    {
+      "openml_id": 1480,
+      "dataset": "ilpd",
+      "logreg": {
+        "mean": 0.7799433026222538,
+        "std": 0.03254702339675414,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.7452161587526577,
+        "std": 0.05493244281730757,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.7232459248759744,
+        "std": 0.04966206664608441,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.7300968580203165,
+        "std": 0.0546325524204022,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.728797543113631,
+        "std": 0.03449328126268554,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.7585636664304275,
+        "std": 0.05458656412490921,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.7585636664304275,
+        "std": 0.05458656412490921,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 1494,
+      "dataset": "qsar-biodeg",
+      "logreg": {
+        "mean": 0.9207914151576123,
+        "std": 0.021981910532599923,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.929560697518444,
+        "std": 0.013488797391861667,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9266096579476861,
+        "std": 0.004277428913138198,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9186452045606975,
+        "std": 0.015819446347788584,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9281019450033533,
+        "std": 0.01094007530303385,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9267940979208583,
+        "std": 0.01379419593000285,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9238095238095237,
+        "std": 0.016213213424534474,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 1510,
+      "dataset": "wdbc",
+      "logreg": {
+        "mean": 0.9928350970017635,
+        "std": 0.005477186176721749,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9893077601410933,
+        "std": 0.0016969581479652743,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9912918871252204,
+        "std": 0.00106301265002121,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9895282186948854,
+        "std": 0.0028891848373194993,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9917328042328043,
+        "std": 0.00335611493554637,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9886463844797179,
+        "std": 0.005356054062282302,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9907407407407408,
+        "std": 0.0034524823111476903,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": null,
+        "std": null,
+        "n_ok": 0,
+        "n_fail": 3
+      }
+    },
+    {
+      "openml_id": 40982,
+      "dataset": "steel-plates-fault",
+      "logreg": {
+        "mean": 0.9299503845658311,
+        "std": 0.0031681573255624524,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9638981959003625,
+        "std": 0.009789631744640636,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9614059679435459,
+        "std": 0.010864951815921963,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9591246771180967,
+        "std": 0.0023297275625606437,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9599562738966995,
+        "std": 0.005406398765757945,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9645846777645494,
+        "std": 0.008418797879656336,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9645846777645494,
+        "std": 0.008418797879656336,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9640147614959477,
+        "std": 0.008216904621420556,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    },
+    {
+      "openml_id": 40994,
+      "dataset": "climate-model-simulation-crashes",
+      "logreg": {
+        "mean": 0.9783015338570894,
+        "std": 0.004535860700704101,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "lgbm": {
+        "mean": 0.9734380845491956,
+        "std": 0.006576279772258483,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "xgb": {
+        "mean": 0.9704451926674148,
+        "std": 0.007883018146541482,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml11": {
+        "mean": 0.9775533108866442,
+        "std": 0.018544008576720887,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "flaml": {
+        "mean": 0.9827908716797605,
+        "std": 0.012311621901911155,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed": {
+        "mean": 0.9700710811821923,
+        "std": 0.008498179342761378,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_fixed_trainw": {
+        "mean": 0.9719416386083052,
+        "std": 0.011717515722683007,
+        "n_ok": 3,
+        "n_fail": 0
+      },
+      "sys_llm": {
+        "mean": 0.9652076318742986,
+        "std": 0.01698400218902532,
+        "n_ok": 3,
+        "n_fail": 0
+      }
+    }
+  ],
+  "avg_rank_imputed": {
+    "logreg": 3.6,
+    "lgbm": 5.266666666666667,
+    "xgb": 5.2,
+    "flaml11": 4.566666666666666,
+    "flaml": 3.5,
+    "sys_fixed": 3.533333333333333,
+    "sys_fixed_trainw": 3.2,
+    "sys_llm": 7.133333333333334
+  },
+  "avg_rank_non_llm": {
+    "logreg": 3.466666666666667,
+    "lgbm": 5.066666666666666,
+    "xgb": 5.066666666666666,
+    "flaml11": 4.433333333333334,
+    "flaml": 3.3666666666666667,
+    "sys_fixed": 3.466666666666667,
+    "sys_fixed_trainw": 3.1333333333333333
+  },
+  "mean_auc_fallback_fixed": {
+    "logreg": 0.8842652849809792,
+    "lgbm": 0.877344358433844,
+    "xgb": 0.87566800667525,
+    "flaml11": 0.8807040957049797,
+    "flaml": 0.8849442733178797,
+    "sys_fixed": 0.8875084618122131,
+    "sys_fixed_trainw": 0.8876176023697704,
+    "sys_llm": 0.8829079816172615
+  },
+  "datasets_all_arms_completed": [
+    15,
+    31,
+    188,
+    1464,
+    40982,
+    40994
+  ],
+  "mean_auc_failures_excluded": {
+    "logreg": 0.8917729258848768,
+    "lgbm": 0.8866725461291306,
+    "xgb": 0.8872536824304696,
+    "flaml11": 0.8850206469043678,
+    "flaml": 0.8877363394378102,
+    "sys_fixed": 0.8924000079971969,
+    "sys_fixed_trainw": 0.8927620896294073,
+    "sys_llm": 0.880898807509818
+  },
+  "mean_auc_imputed": {
+    "logreg": 0.8842652849809792,
+    "lgbm": 0.877344358433844,
+    "xgb": 0.87566800667525,
+    "flaml11": 0.8807040957049797,
+    "flaml": 0.8849442733178797,
+    "sys_fixed": 0.8875084618122131,
+    "sys_fixed_trainw": 0.8876176023697704,
+    "sys_llm": 0.6523595230039272
+  },
+  "paired_tests": [
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.011501200487378868,
+      "median_diff": -0.0018323615159433482,
+      "ci95": [
+        -0.03151955282213611,
+        -0.00042446013484320755
+      ],
+      "wins": 1,
+      "losses": 5,
+      "ties": 0,
+      "wilcoxon_p": 0.15625,
+      "holm_p": 0.46875
+    },
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.23514893880828583,
+      "median_diff": -0.2585636664304275,
+      "ci95": [
+        -0.3333054283871189,
+        -0.1365314117198618
+      ],
+      "wins": 1,
+      "losses": 14,
+      "ties": 0,
+      "wilcoxon_p": 0.00030517578125,
+      "holm_p": 0.00091552734375
+    },
+    {
+      "a": "sys_llm",
+      "b": "sys_fixed",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.004600480194951547,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.01297586777587809,
+        -4.7590292155486046e-05
+      ],
+      "wins": 1,
+      "losses": 5,
+      "ties": 9,
+      "wilcoxon_p": 0.11585149752593006,
+      "holm_p": 0.3475544925777902
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.004121839394549798,
+      "median_diff": -0.0037017698778194497,
+      "ci95": [
+        -0.019394335878311592,
+        0.010739263385624273
+      ],
+      "wins": 2,
+      "losses": 4,
+      "ties": 0,
+      "wilcoxon_p": 0.5625,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.22834457270105257,
+      "median_diff": -0.2458418972069878,
+      "ci95": [
+        -0.3272987577434036,
+        -0.12871736027010502
+      ],
+      "wins": 2,
+      "losses": 13,
+      "ties": 0,
+      "wilcoxon_p": 0.00115966796875,
+      "holm_p": 0.0023193359375
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml11",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": 0.002203885912281704,
+      "median_diff": 0.00013045803817191004,
+      "ci95": [
+        -0.005599968066477306,
+        0.009602576664478385
+      ],
+      "wins": 8,
+      "losses": 7,
+      "ties": 0,
+      "wilcoxon_p": 0.5994873046875,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "completed",
+      "family": "llm",
+      "n_datasets": 6,
+      "mean_diff": -0.006837531927992191,
+      "median_diff": -0.003154517462360451,
+      "ci95": [
+        -0.023228311782889848,
+        0.007883263451492503
+      ],
+      "wins": 2,
+      "losses": 4,
+      "ties": 0,
+      "wilcoxon_p": 0.5625,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "imputed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.2325847503139525,
+      "median_diff": -0.24128510147549775,
+      "ci95": [
+        -0.33258484293097174,
+        -0.13206562840497174
+      ],
+      "wins": 2,
+      "losses": 13,
+      "ties": 0,
+      "wilcoxon_p": 0.00115966796875,
+      "holm_p": 0.0023193359375
+    },
+    {
+      "a": "sys_llm",
+      "b": "flaml",
+      "mode": "fallback_fixed",
+      "family": "llm",
+      "n_datasets": 15,
+      "mean_diff": -0.0020362917006182535,
+      "median_diff": -0.001307847082494984,
+      "ci95": [
+        -0.010090670393539773,
+        0.005645291335434676
+      ],
+      "wins": 6,
+      "losses": 9,
+      "ties": 0,
+      "wilcoxon_p": 0.52447509765625,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_fixed",
+      "b": "flaml",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.0025641884943332933,
+      "median_diff": -0.0004886164502133639,
+      "ci95": [
+        -0.0028837185749762714,
+        0.008825735713463507
+      ],
+      "wins": 7,
+      "losses": 8,
+      "ties": 0,
+      "wilcoxon_p": 0.76153564453125,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_fixed",
+      "b": "flaml",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.0025641884943332933,
+      "median_diff": -0.0004886164502133639,
+      "ci95": [
+        -0.0028837185749762714,
+        0.008825735713463507
+      ],
+      "wins": 7,
+      "losses": 8,
+      "ties": 0,
+      "wilcoxon_p": 0.76153564453125,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_fixed",
+      "b": "flaml11",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.006804366107233251,
+      "median_diff": 0.004435455255127341,
+      "ci95": [
+        0.001325254395079852,
+        0.01279905378145058
+      ],
+      "wins": 9,
+      "losses": 6,
+      "ties": 0,
+      "wilcoxon_p": 0.10699462890625,
+      "holm_p": 0.427978515625
+    },
+    {
+      "a": "sys_fixed",
+      "b": "flaml11",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.006804366107233251,
+      "median_diff": 0.004435455255127341,
+      "ci95": [
+        0.001325254395079852,
+        0.01279905378145058
+      ],
+      "wins": 9,
+      "losses": 6,
+      "ties": 0,
+      "wilcoxon_p": 0.10699462890625,
+      "holm_p": 0.427978515625
+    },
+    {
+      "a": "sys_fixed",
+      "b": "lgbm",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.010164103378369031,
+      "median_diff": 0.008928571428571397,
+      "ci95": [
+        0.0041222684507785,
+        0.01664210567900564
+      ],
+      "wins": 12,
+      "losses": 3,
+      "ties": 0,
+      "wilcoxon_p": 0.0067138671875,
+      "holm_p": 0.040283203125
+    },
+    {
+      "a": "sys_fixed",
+      "b": "lgbm",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.010164103378369031,
+      "median_diff": 0.008928571428571397,
+      "ci95": [
+        0.0041222684507785,
+        0.01664210567900564
+      ],
+      "wins": 12,
+      "losses": 3,
+      "ties": 0,
+      "wilcoxon_p": 0.0067138671875,
+      "holm_p": 0.040283203125
+    },
+    {
+      "a": "sys_fixed",
+      "b": "xgb",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.011840455136962835,
+      "median_diff": 0.0031787098210034337,
+      "ci95": [
+        0.004607769689319162,
+        0.01941361598369681
+      ],
+      "wins": 12,
+      "losses": 3,
+      "ties": 0,
+      "wilcoxon_p": 0.012451171875,
+      "holm_p": 0.062255859375
+    },
+    {
+      "a": "sys_fixed",
+      "b": "xgb",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.011840455136962835,
+      "median_diff": 0.0031787098210034337,
+      "ci95": [
+        0.004607769689319162,
+        0.01941361598369681
+      ],
+      "wins": 12,
+      "losses": 3,
+      "ties": 0,
+      "wilcoxon_p": 0.012451171875,
+      "holm_p": 0.062255859375
+    },
+    {
+      "a": "sys_fixed",
+      "b": "logreg",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.0032431768312338517,
+      "median_diff": -0.0016049382716051275,
+      "ci95": [
+        -0.0060418107026079144,
+        0.013153874400665644
+      ],
+      "wins": 7,
+      "losses": 8,
+      "ties": 0,
+      "wilcoxon_p": 0.803955078125,
+      "holm_p": 1.0
+    },
+    {
+      "a": "sys_fixed",
+      "b": "logreg",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.0032431768312338517,
+      "median_diff": -0.0016049382716051275,
+      "ci95": [
+        -0.0060418107026079144,
+        0.013153874400665644
+      ],
+      "wins": 7,
+      "losses": 8,
+      "ties": 0,
+      "wilcoxon_p": 0.803955078125,
+      "holm_p": 1.0
+    },
+    {
+      "a": "flaml",
+      "b": "lgbm",
+      "mode": "completed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.007599914884035737,
+      "median_diff": 0.0024250440917109595,
+      "ci95": [
+        -0.0007250270813905867,
+        0.016798400296566866
+      ],
+      "wins": 9,
+      "losses": 6,
+      "ties": 0,
+      "wilcoxon_p": 0.22930908203125,
+      "holm_p": 0.68792724609375
+    },
+    {
+      "a": "flaml",
+      "b": "lgbm",
+      "mode": "imputed",
+      "family": "non_llm",
+      "n_datasets": 15,
+      "mean_diff": 0.007599914884035737,
+      "median_diff": 0.0024250440917109595,
+      "ci95": [
+        -0.0007250270813905867,
+        0.016798400296566866
+      ],
+      "wins": 9,
+      "losses": 6,
+      "ties": 0,
+      "wilcoxon_p": 0.22930908203125,
+      "holm_p": 0.68792724609375
+    },
+    {
+      "a": "sys_fixed_trainw",
+      "b": "sys_fixed",
+      "mode": "completed",
+      "family": "sensitivity",
+      "n_datasets": 15,
+      "mean_diff": 0.00010914055755741891,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.0004485552324987004,
+        0.0006110154278101391
+      ],
+      "wins": 4,
+      "losses": 1,
+      "ties": 10,
+      "wilcoxon_p": 0.5001842570707944,
+      "holm_p": 0.5001842570707944
+    },
+    {
+      "a": "sys_fixed_trainw",
+      "b": "sys_fixed",
+      "mode": "imputed",
+      "family": "sensitivity",
+      "n_datasets": 15,
+      "mean_diff": 0.00010914055755741891,
+      "median_diff": 0.0,
+      "ci95": [
+        -0.0004485552324987004,
+        0.0006110154278101391
+      ],
+      "wins": 4,
+      "losses": 1,
+      "ties": 10,
+      "wilcoxon_p": 0.5001842570707944,
+      "holm_p": 0.5001842570707944
+    }
+  ],
+  "candidate_model_failures": {
+    "sys_fixed": {
+      "xgboost": {
+        "runs": 15,
+        "datasets": [
+          "blood-transfusion",
+          "cmc",
+          "ilpd",
+          "qsar-biodeg",
+          "wdbc"
+        ]
+      }
+    },
+    "sys_fixed_trainw": {
+      "xgboost": {
+        "runs": 15,
+        "datasets": [
+          "blood-transfusion",
+          "cmc",
+          "ilpd",
+          "qsar-biodeg",
+          "wdbc"
+        ]
+      }
+    },
+    "sys_llm": {
+      "xgboost": {
+        "runs": 3,
+        "datasets": [
+          "blood-transfusion"
+        ]
+      }
+    }
+  },
+  "per_arm": {
+    "logreg": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 0.03,
+      "wall_mean_s": 0.038888888888888896,
+      "wall_total_s": 1.7500000000000004,
+      "errors": []
+    },
+    "lgbm": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 0.12,
+      "wall_mean_s": 0.21088888888888885,
+      "wall_total_s": 9.489999999999998,
+      "errors": []
+    },
+    "xgb": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 0.11,
+      "wall_mean_s": 0.17511111111111108,
+      "wall_total_s": 7.879999999999999,
+      "errors": []
+    },
+    "flaml11": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 11.18,
+      "wall_mean_s": 19.005999999999997,
+      "wall_total_s": 855.2699999999999,
+      "errors": []
+    },
+    "flaml": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 60.28,
+      "wall_mean_s": 76.6151111111111,
+      "wall_total_s": 3447.68,
+      "errors": []
+    },
+    "sys_fixed": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 11.14,
+      "wall_mean_s": 12.140444444444446,
+      "wall_total_s": 546.32,
+      "errors": []
+    },
+    "sys_fixed_trainw": {
+      "runs": 45,
+      "failed": 0,
+      "wall_median_s": 8.61,
+      "wall_mean_s": 9.166444444444446,
+      "wall_total_s": 412.49000000000007,
+      "errors": []
+    },
+    "sys_llm": {
+      "runs": 45,
+      "failed": 27,
+      "wall_median_s": 9.15,
+      "wall_mean_s": 33.47288888888889,
+      "wall_total_s": 1506.28,
+      "errors": [
+        [
+          "Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: Tracebac",
+          15
+        ],
+        [
+          "Evaluator failed: No model trained successfully; cannot evaluate.",
+          9
+        ],
+        [
+          "Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: Timeout ",
+          3
+        ]
+      ]
+    }
+  },
+  "llm": {
+    "model": {
+      "planner": "qwen2.5:7b",
+      "codegen": "qwen2.5:7b",
+      "base_url": "http://localhost:11434/v1",
+      "num_ctx": 8192
+    },
+    "llm_calls_total": 61,
+    "llm_seconds_total": 567.42,
+    "planned_metric": {
+      "auc": 15
+    },
+    "planned_models": {
+      "lightgbm,xgboost,random_forest,mlp": 14,
+      "lightgbm,xgboost,random_forest,mlp,logistic_regression": 1
+    },
+    "winner": {
+      "random_forest": 6,
+      "mlp": 4,
+      "xgboost": 6,
+      "lightgbm": 2
+    },
+    "fe_attempts_per_dataset": [
+      2,
+      3,
+      1,
+      3,
+      3,
+      3,
+      1,
+      2,
+      2,
+      3,
+      1,
+      1,
+      3,
+      2,
+      1
+    ],
+    "fe_first_try_success": 5,
+    "fe_exit0_but_no_output_attempts": 4,
+    "fe_datasets_with_exit0_no_output": 4,
+    "fe_failed_datasets": 6,
+    "orchestrator_failed": 0,
+    "same_split_as_baselines": {
+      "true": 18
+    },
+    "datasets_with_seed0_record": 15
+  },
+  "sys_fixed_winner": {
+    "random_forest": 26,
+    "lightgbm": 7,
+    "xgboost": 12
+  }
+}

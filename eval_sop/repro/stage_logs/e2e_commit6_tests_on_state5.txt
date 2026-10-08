@@ -1,0 +1,60 @@
+F....F                                                                   [100%]
+================================== FAILURES ===================================
+__________ test_plan_reaches_trainer_and_evaluator_through_the_graph __________
+
+csv_path = '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-656\\test_plan_reaches_trainer_and_0\\data.csv'
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-656/test_plan_reaches_trainer_and_0')
+
+    def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path):
+        fake = FakeLLM()
+        final = _run_graph(csv_path, tmp_path, fake)
+    
+        assert not final.get("error"), final.get("error")
+        assert final["orchestrator_plan"]["suggested_models"] == ["logistic_regression", "mlp"]
+        # The trainer trained the PLANNED models, not its defaults.
+        assert set(final["model_results"]) == {"logistic_regression", "mlp"}
+        # CV scored the planned metric (f1 -> f1_weighted), not a hard-coded one.
+        for r in final["model_results"].values():
+            assert r["cv_metric"] == "f1_weighted"
+        # The evaluator ranked on the planned metric, on CV.
+        ev = final["evaluation_result"]
+        assert ev["primary_metric"] == "f1"
+>       assert ev["selection_basis"] == "cv"
+               ^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'selection_basis'
+
+tests\test_e2e_from_commit6.py:135: KeyError
+------------------------------ Captured log call ------------------------------
+WARNING  agents.evaluator:evaluator.py:260 SHAP explainability failed (non-fatal): Numba needs NumPy 2.4 or less. Got NumPy 2.5.
+_____________________ test_selection_uses_cv_not_holdout ______________________
+
+    def test_selection_uses_cv_not_holdout():
+        from agents.evaluator import _select_winner
+    
+        results = {
+            # Best on the held-out test set, worse on CV: must NOT win.
+            "a": {"metrics": {"auc": 0.99}, "cv_mean": 0.70, "cv_metric": "roc_auc",
+                  "model_object": object(), "error": None},
+            "b": {"metrics": {"auc": 0.80}, "cv_mean": 0.85, "cv_metric": "roc_auc",
+                  "model_object": object(), "error": None},
+        }
+        winner, ranking = _select_winner(results, "auc")
+>       assert winner == "b" and ranking == ["b", "a"]
+E       AssertionError: assert ('a' == 'b'
+E         
+E         - b
+E         + a)
+
+tests\test_e2e_from_commit6.py:220: AssertionError
+============================== warnings summary ===============================
+tests/test_e2e_from_commit6.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit6.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_from_commit6.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+FAILED tests/test_e2e_from_commit6.py::test_selection_uses_cv_not_holdout - A...
+2 failed, 4 passed, 2 warnings in 45.81s
+exit=1

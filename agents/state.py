@@ -62,7 +62,8 @@ class FeatureEngineeringResult(TypedDict, total=False):
     new_features_created: list[str]
     dropped_columns: list[str]
     leakage_warnings: list[str]  # Any data leakage risks flagged
-    transformed_csv_path: str  # Path inside E2B sandbox
+    transformed_csv_path: str  # Local path of the processed CSV (never the raw input)
+    attempts: int  # Sandbox attempts used, including self-corrections
 
 
 class EvaluationResult(TypedDict, total=False):
@@ -72,6 +73,7 @@ class EvaluationResult(TypedDict, total=False):
     ranking: list[str]  # model names ordered best → worst
     justification: str
     primary_metric: str  # The metric used to pick the winner
+    selection_basis: str  # "cv" (CV on the training split) or "holdout" (row-cap fallback)
     shap_plot_path: str
     bias_warnings: list[str]
     comparison_table: list[dict[str, Any]]
@@ -86,6 +88,15 @@ class DeploymentArtifacts(TypedDict, total=False):
     dockerfile: str
     openapi_spec: dict[str, Any]
     mlflow_model_uri: str
+
+
+class OrchestratorPlan(TypedDict, total=False):
+    """The orchestrator's plan, read by the trainer and evaluator."""
+
+    task_type: str
+    primary_metric: str
+    target_column: str
+    suggested_models: list[str]
 
 
 class AgentState(TypedDict, total=False):
@@ -109,8 +120,14 @@ class AgentState(TypedDict, total=False):
     status: str  # "running" | "completed" | "failed"
     current_step: str  # Human-readable current agent name
     error: Optional[str]  # Set if any agent fails fatally
+    random_seed: int  # Seed for the holdout split, CV folds and model RNGs (default 42)
 
     # ── Agent outputs ──────────────────────────────────────────────────────────
+    # Must be a declared key: LangGraph drops any key a node returns that is not
+    # in the state schema. It used to be returned as "_orchestrator_plan", which
+    # was silently discarded, so the trainer and evaluator always fell back to
+    # their hard-coded defaults and the LLM's model/metric choice did nothing.
+    orchestrator_plan: Optional[OrchestratorPlan]
     dataset_profile: Optional[DatasetProfile]
     feature_result: Optional[FeatureEngineeringResult]
     model_results: dict[str, ModelResult]  # model_name → result

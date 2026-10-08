@@ -1,0 +1,44 @@
+F                                                                        [100%]
+================================== FAILURES ===================================
+__________ test_plan_reaches_trainer_and_evaluator_through_the_graph __________
+
+csv_path = '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-644\\test_plan_reaches_trainer_and_0\\data.csv'
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-644/test_plan_reaches_trainer_and_0')
+
+    def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path):
+        fake = FakeLLM()
+        final = _run_graph(csv_path, tmp_path, fake)
+    
+        assert not final.get("error"), final.get("error")
+>       assert final["orchestrator_plan"]["suggested_models"] == ["logistic_regression", "mlp"]
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+E       KeyError: 'orchestrator_plan'
+
+tests\test_e2e_from_commit1.py:126: KeyError
+------------------------------ Captured log call ------------------------------
+WARNING  agents.evaluator:evaluator.py:260 SHAP explainability failed (non-fatal): Numba needs NumPy 2.4 or less. Got NumPy 2.5.
+============================== warnings summary ===============================
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\dask\dataframe\utils.py:320: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+    "m": np.timedelta64(1),
+
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+    warnings.warn(
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_from_commit1.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+1 failed, 10 warnings in 355.92s (0:05:55)
+exit=1

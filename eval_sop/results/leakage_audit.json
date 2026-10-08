@@ -1,0 +1,200 @@
+[
+  {
+    "openml_id": 3,
+    "dataset": "kr-vs-kp",
+    "rows_full_in_out": [
+      3196,
+      3196
+    ],
+    "rows_train_in_out": [
+      2556,
+      2556
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 15,
+    "dataset": "breast-w",
+    "rows_full_in_out": [
+      699,
+      699
+    ],
+    "rows_train_in_out": [
+      559,
+      559
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 29,
+    "dataset": "credit-approval",
+    "rows_full_in_out": [
+      690,
+      690
+    ],
+    "rows_train_in_out": [
+      552,
+      552
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 31,
+    "dataset": "credit-g",
+    "rows_full_in_out": [
+      1000,
+      1000
+    ],
+    "rows_train_in_out": [
+      800,
+      800
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 188,
+    "dataset": "eucalyptus",
+    "rows_full_in_out": [
+      736,
+      736
+    ],
+    "rows_train_in_out": [
+      588,
+      588
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 1067,
+    "dataset": "kc1",
+    "rows_full_in_out": [
+      2109,
+      2109
+    ],
+    "rows_train_in_out": [
+      1687,
+      1687
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 1464,
+    "dataset": "blood-transfusion",
+    "rows_full_in_out": [
+      748,
+      748
+    ],
+    "rows_train_in_out": [
+      598,
+      598
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 40982,
+    "dataset": "steel-plates-fault",
+    "rows_full_in_out": [
+      1941,
+      1941
+    ],
+    "rows_train_in_out": [
+      1552,
+      1552
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  },
+  {
+    "openml_id": 40994,
+    "dataset": "climate-model-simulation-crashes",
+    "rows_full_in_out": [
+      540,
+      540
+    ],
+    "rows_train_in_out": [
+      432,
+      432
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok"
+  }
+]

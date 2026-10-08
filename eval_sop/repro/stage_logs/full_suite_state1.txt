@@ -1,0 +1,229 @@
+..........................F.....F.F....s........F....................... [ 85%]
+.....FFFF...                                                             [100%]
+================================== FAILURES ===================================
+__________ test_plan_reaches_trainer_and_evaluator_through_the_graph __________
+
+csv_path = '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-647\\test_plan_reaches_trainer_and_0\\data.csv'
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_plan_reaches_trainer_and_0')
+
+    def test_plan_reaches_trainer_and_evaluator_through_the_graph(csv_path, tmp_path):
+        fake = FakeLLM()
+        final = _run_graph(csv_path, tmp_path, fake)
+    
+>       assert not final.get("error"), final.get("error")
+E       AssertionError: Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: 
+E       assert not 'Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: '
+E        +  where 'Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: ' = <built-in method get of dict object at 0x0000022A40FD5540>('error')
+E        +    where <built-in method get of dict object at 0x0000022A40FD5540> = {'api_key': 'x', 'business_problem': 'Predict label', 'csv_path': '<HOME>\\AppData\\Local\\Temp\\pytest-of-<user>\\pytest-647\\test_plan_reaches_trainer_and_0\\data.csv', 'current_step': 'feature_engineer', ...}.get
+
+tests\test_graph_e2e.py:125: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  sandbox.executor:executor.py:299 Attempt 1 failed: 
+WARNING  sandbox.executor:executor.py:299 Attempt 2 failed: 
+WARNING  sandbox.executor:executor.py:299 Attempt 3 failed: 
+ERROR    agents.feature_engineer:feature_engineer.py:184 Feature Engineer failed: Feature engineering failed after 3 attempts. Last error: 
+Traceback (most recent call last):
+  File "<SCRATCH>\wt\amlpb_stage1\agents\feature_engineer.py", line 146, in run_feature_engineer
+    raise RuntimeError(
+RuntimeError: Feature engineering failed after 3 attempts. Last error:
+__________ TestSandboxExecutor.test_subprocess_executor_simple_code ___________
+
+self = <tests.test_pipeline.TestSandboxExecutor object at 0x00000229E7EA7620>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_subprocess_executor_simpl0')
+
+    def test_subprocess_executor_simple_code(self, tmp_path):
+        """subprocess executor runs simple Python successfully."""
+        from sandbox.executor import _execute_subprocess
+    
+        code = "print('hello world')"
+        csv_path = str(tmp_path / "dummy.csv")
+        import pandas as pd
+    
+        pd.DataFrame({"A": [1]}).to_csv(csv_path, index=False)
+    
+        result = _execute_subprocess(code, csv_path, timeout=30)
+>       assert result["success"] is True
+E       assert False is True
+
+tests\test_pipeline.py:74: AssertionError
+_________ TestSandboxExecutor.test_self_correction_called_on_failure __________
+
+self = <tests.test_pipeline.TestSandboxExecutor object at 0x00000229E7EA7F80>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_self_correction_called_on0')
+
+    def test_self_correction_called_on_failure(self, tmp_path):
+        """execute_with_retry calls LLM for correction on failure."""
+        from sandbox.executor import execute_with_retry
+    
+        bad_code = "raise ValueError('intentional error for test')"
+        good_code = "print('fixed')"
+    
+        csv_path = str(tmp_path / "dummy.csv")
+        import pandas as pd
+    
+        pd.DataFrame({"A": [1]}).to_csv(csv_path, index=False)
+    
+        mock_llm = MagicMock()
+        mock_llm.invoke.return_value = MagicMock(content=good_code)
+    
+        with patch("sandbox.executor.settings") as mock_settings:
+            mock_settings.execution_backend = "subprocess"
+            mock_settings.e2b_api_key = ""
+            mock_settings.allow_local_exec = True
+            mock_settings.sandbox_timeout_seconds = 30
+    
+            result = execute_with_retry(
+                code=bad_code,
+                csv_path=csv_path,
+                llm=mock_llm,
+                max_retries=2,
+            )
+    
+        # LLM was called to fix the code, and the corrected code then succeeded.
+        assert mock_llm.invoke.called
+>       assert result["success"] is True
+E       assert False is True
+
+tests\test_pipeline.py:117: AssertionError
+------------------------------ Captured log call ------------------------------
+WARNING  sandbox.executor:executor.py:299 Attempt 1 failed: 
+WARNING  sandbox.executor:executor.py:299 Attempt 2 failed:
+_______________ test_generated_code_runs_under_this_interpreter _______________
+
+    def test_generated_code_runs_under_this_interpreter():
+        """
+        The subprocess backend invoked bare "python". Inside a venv that is the
+        wrong interpreter, and on a slim container or most Linux hosts there is no
+        "python" on PATH at all — the sandbox simply could not start.
+        """
+        result = _execute_subprocess("import sys; print(sys.executable)", "", 60)
+>       assert result["success"], result["stderr"]
+E       AssertionError: 
+E       assert False
+
+tests\test_regressions.py:118: AssertionError
+__________________ TestSubprocessExecution.test_simple_print __________________
+
+self = <tests.test_sandbox.TestSubprocessExecution object at 0x00000229EA4E94F0>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_simple_print0')
+
+    def test_simple_print(self, tmp_path):
+        """Basic Python execution works."""
+        from sandbox.executor import _execute_subprocess
+    
+        code = "print('test output 123')"
+        result = _execute_subprocess(code, str(tmp_path / "dummy.csv"), 30)
+>       assert result["success"]
+E       assert False
+
+tests\test_sandbox.py:16: AssertionError
+__________________ TestSubprocessExecution.test_csv_reading ___________________
+
+self = <tests.test_sandbox.TestSubprocessExecution object at 0x00000229EA4EB7D0>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_csv_reading0')
+
+        def test_csv_reading(self, tmp_path):
+            """Can read a CSV inside subprocess."""
+            from sandbox.executor import _execute_subprocess
+    
+            csv_path = str(tmp_path / "data.csv")
+            df = pd.DataFrame({"x": [1, 2, 3], "y": [4, 5, 6]})
+            df.to_csv(csv_path, index=False)
+    
+            # Use repr() so Windows backslash paths become a valid string literal.
+            code = f"""
+    import pandas as pd
+    df = pd.read_csv({csv_path!r})
+    print(f'rows={{len(df)}}')
+    """
+            result = _execute_subprocess(code, csv_path, 30)
+>           assert result["success"]
+E           assert False
+
+tests\test_sandbox.py:34: AssertionError
+_____________ TestSubprocessExecution.test_import_error_detected ______________
+
+self = <tests.test_sandbox.TestSubprocessExecution object at 0x00000229EA4FDAC0>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_import_error_detected0')
+
+    def test_import_error_detected(self, tmp_path):
+        """Import errors are caught and reported."""
+        from sandbox.executor import _execute_subprocess
+    
+        code = "import nonexistent_package_xyz_abc"
+        result = _execute_subprocess(code, str(tmp_path / "dummy.csv"), 30)
+        assert result["success"] is False
+>       assert result["error_text"] or result["stderr"]
+E       AssertionError: assert ('' or '')
+
+tests\test_sandbox.py:44: AssertionError
+________________ TestSubprocessExecution.test_timeout_handling ________________
+
+self = <tests.test_sandbox.TestSubprocessExecution object at 0x00000229EA4FC3E0>
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-647/test_timeout_handling0')
+
+    def test_timeout_handling(self, tmp_path):
+        """Timeout is enforced."""
+        from sandbox.executor import _execute_subprocess
+    
+        code = "import time; time.sleep(60)"  # Will time out
+        result = _execute_subprocess(code, str(tmp_path / "dummy.csv"), timeout=2)
+        assert result["success"] is False
+>       assert (
+            "timeout" in result["error_text"].lower() or "Timeout" in result["stderr"]
+        )
+E       AssertionError: assert ('timeout' in '' or 'Timeout' in '')
+E        +  where '' = <built-in method lower of str object at 0x00007FF9B6C2AD00>()
+E        +    where <built-in method lower of str object at 0x00007FF9B6C2AD00> = ''.lower
+
+tests\test_sandbox.py:53: AssertionError
+============================== warnings summary ===============================
+..\..\..\..\..\..\..\..\..\anaconda3\Lib\site-packages\fastapi\testclient.py:1
+  <HOME>\anaconda3\Lib\site-packages\fastapi\testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+tests/test_agents.py::TestDataAnalyst::test_profile_dataframe_numeric_detection
+tests/test_agents.py::TestDataAnalyst::test_profile_dataframe_numeric_detection
+tests/test_ml_pipeline.py::test_trainer_produces_fitted_pipelines_with_cv
+tests/test_ml_pipeline.py::test_trainer_produces_fitted_pipelines_with_cv
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+tests/test_agents.py::TestModelTrainer::test_make_model_lightgbm_classification
+  <HOME>\anaconda3\Lib\site-packages\dask\dataframe\utils.py:320: DeprecationWarning: The 'generic' unit for NumPy timedelta is deprecated, and will raise an error in the future. This includes implicit conversion of bare integers (e.g. `+ 1`). Please use a specific unit instead.
+    "m": np.timedelta64(1),
+
+tests/test_ml_pipeline.py::test_trainer_produces_fitted_pipelines_with_cv
+  <HOME>\anaconda3\Lib\site-packages\mlflow\tracking\_tracking_service\utils.py:184: FutureWarning: The filesystem tracking backend (e.g., './mlruns') is deprecated as of February 2026. Consider transitioning to a database backend (e.g., 'sqlite:///mlflow.db') to take advantage of the latest MLflow features. See https://mlflow.org/docs/latest/self-hosting/migrate-from-file-store for migration guidance.
+    return FileStore(store_uri, store_uri)
+
+tests/test_ml_pipeline.py: 14 warnings
+  <HOME>\anaconda3\Lib\site-packages\sklearn\utils\validation.py:2691: UserWarning: X does not have valid feature names, but LGBMClassifier was fitted with feature names
+    warnings.warn(
+
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+tests/test_ml_pipeline.py::test_evaluator_selects_deterministically_and_persists_runnable_model
+  <HOME>\anaconda3\Lib\site-packages\joblib\numpy_pickle.py:207: DeprecationWarning: Setting the shape on a NumPy array has been deprecated in NumPy 2.5.
+  As an alternative, you can create a new view using np.reshape (with copy=False if needed).
+    array.shape = self.shape
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_graph_e2e.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+FAILED tests/test_pipeline.py::TestSandboxExecutor::test_subprocess_executor_simple_code
+FAILED tests/test_pipeline.py::TestSandboxExecutor::test_self_correction_called_on_failure
+FAILED tests/test_regressions.py::test_generated_code_runs_under_this_interpreter
+FAILED tests/test_sandbox.py::TestSubprocessExecution::test_simple_print - as...
+FAILED tests/test_sandbox.py::TestSubprocessExecution::test_csv_reading - ass...
+FAILED tests/test_sandbox.py::TestSubprocessExecution::test_import_error_detected
+FAILED tests/test_sandbox.py::TestSubprocessExecution::test_timeout_handling
+8 failed, 75 passed, 1 skipped, 31 warnings in 205.83s (0:03:25)
+exit=1

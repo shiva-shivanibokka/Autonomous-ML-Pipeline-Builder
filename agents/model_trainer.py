@@ -89,7 +89,7 @@ def _build_preprocessor(X: pd.DataFrame) -> ColumnTransformer:
 # ── Model factories ────────────────────────────────────────────────────────────
 
 
-def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
+def _make_model(model_name: str, task_type: str, scale_pos: float, seed: int = 42) -> Any:
     """Return a freshly instantiated estimator. `scale_pos` weights the positive class."""
     is_imbalanced = scale_pos > 1
 
@@ -105,7 +105,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
                 subsample=0.8,
                 colsample_bytree=0.8,
                 scale_pos_weight=scale_pos,
-                random_state=42,
+                random_state=seed,
                 verbose=-1,
             )
         return lgb.LGBMRegressor(
@@ -115,7 +115,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
             num_leaves=31,
             subsample=0.8,
             colsample_bytree=0.8,
-            random_state=42,
+            random_state=seed,
             verbose=-1,
         )
 
@@ -132,7 +132,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
                 scale_pos_weight=scale_pos,
                 eval_metric="logloss",
                 # use_label_encoder was removed in xgboost 2.x — passing it now errors.
-                random_state=42,
+                random_state=seed,
                 verbosity=0,
             )
         return XGBRegressor(
@@ -141,7 +141,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
             max_depth=6,
             subsample=0.8,
             colsample_bytree=0.8,
-            random_state=42,
+            random_state=seed,
             verbosity=0,
         )
 
@@ -153,7 +153,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
             max_depth=10,
             min_samples_leaf=5,
             n_jobs=-1,
-            random_state=42,
+            random_state=seed,
         )
         if task_type == "classification":
             kwargs["class_weight"] = "balanced" if is_imbalanced else None
@@ -167,7 +167,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
             hidden_layer_sizes=(128, 64),
             max_iter=300,
             early_stopping=True,
-            random_state=42,
+            random_state=seed,
         )
         if task_type == "classification":
             return MLPClassifier(**kwargs)
@@ -180,7 +180,7 @@ def _make_model(model_name: str, task_type: str, scale_pos: float) -> Any:
             return LogisticRegression(
                 max_iter=1000,
                 class_weight="balanced" if is_imbalanced else None,
-                random_state=42,
+                random_state=seed,
             )
         from sklearn.linear_model import Ridge
 
@@ -229,16 +229,46 @@ def _compute_metrics(
     return metrics
 
 
-def _cross_validate(pipe: Pipeline, X_train, y_train, task_type: str) -> tuple[float, float, str]:
+# sklearn scorer for each primary metric. CV is the model-selection signal, so
+# it must score the SAME metric the evaluator ranks on (it used to be
+# f1_weighted regardless of the plan, while selection used holdout AUC).
+# Neg-scorers keep "higher is better" for every metric.
+_CV_SCORERS = {
+    "f1": "f1_weighted",
+    "rmse": "neg_root_mean_squared_error",
+    "r2": "r2",
+    "mape": "neg_mean_absolute_percentage_error",
+}
+
+
+def cv_scorer_for(primary_metric: str, task_type: str, n_classes: int) -> str:
+    """Return the sklearn scoring string used to cross-validate `primary_metric`."""
+    if primary_metric == "auc":
+        return "roc_auc" if n_classes <= 2 else "roc_auc_ovr"
+    if primary_metric in _CV_SCORERS:
+        return _CV_SCORERS[primary_metric]
+    if task_type == "classification":
+        return "roc_auc" if n_classes <= 2 else "roc_auc_ovr"
+    return "neg_root_mean_squared_error"
+
+
+def _cross_validate(
+    pipe: Pipeline,
+    X_train,
+    y_train,
+    task_type: str,
+    primary_metric: str = "",
+    seed: int = 42,
+) -> tuple[float, float, str]:
     """Leakage-free CV score (prep is re-fit inside each fold). Skips huge datasets."""
     if len(X_train) > _CV_ROW_CAP:
         return 0.0, 0.0, "skipped(n>cap)"
+    n_classes = len(np.unique(y_train)) if task_type == "classification" else 0
+    scorer = cv_scorer_for(primary_metric, task_type, n_classes)
     if task_type == "classification":
-        scorer = "f1_weighted"
-        splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+        splitter = StratifiedKFold(n_splits=5, shuffle=True, random_state=seed)
     else:
-        scorer = "r2"
-        splitter = KFold(n_splits=5, shuffle=True, random_state=42)
+        splitter = KFold(n_splits=5, shuffle=True, random_state=seed)
     try:
         scores = cross_val_score(pipe, X_train, y_train, cv=splitter, scoring=scorer, n_jobs=1)
         return round(float(scores.mean()), 4), round(float(scores.std()), 4), scorer
@@ -257,6 +287,8 @@ async def _train_single_model(
     task_type: str,
     scale_pos: float,
     provider: str,
+    primary_metric: str = "",
+    seed: int = 42,
 ) -> tuple[str, ModelResult]:
     """Train one model (prep+estimator Pipeline) asynchronously. Returns (name, ModelResult)."""
     loop = asyncio.get_running_loop()
@@ -268,11 +300,13 @@ async def _train_single_model(
         # Each model gets its OWN cloned preprocessor so the fit is per-pipeline.
         from sklearn.base import clone
 
-        estimator = _make_model(model_name, task_type, scale_pos)
+        estimator = _make_model(model_name, task_type, scale_pos, seed)
         pipe = Pipeline([("prep", clone(preprocessor)), ("model", estimator)])
 
         # Cross-validate BEFORE the final fit (prep re-fit inside every fold → no leakage).
-        cv_mean, cv_std, cv_metric = _cross_validate(pipe, X_train, y_train, task_type)
+        cv_mean, cv_std, cv_metric = _cross_validate(
+            pipe, X_train, y_train, task_type, primary_metric, seed
+        )
 
         pipe.fit(X_train, y_train)
 
@@ -357,14 +391,18 @@ def run_model_trainer(state: AgentState) -> dict:
     logs = list(state.get("logs", []))
 
     try:
-        plan = state.get("_orchestrator_plan") or {}
+        plan = state.get("orchestrator_plan") or {}
         profile = state.get("dataset_profile") or {}
         feature_result = state.get("feature_result") or {}
+        seed = int(state.get("random_seed", 42))
 
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "")
         suggested_models = plan.get(
             "suggested_models", ["lightgbm", "xgboost", "random_forest"]
+        )
+        primary_metric = plan.get(
+            "primary_metric", "auc" if task_type == "classification" else "rmse"
         )
 
         logs.append(
@@ -414,7 +452,7 @@ def run_model_trainer(state: AgentState) -> dict:
         # can address columns by name.
         stratify = y_arr if (task_type == "classification" and len(np.unique(y_arr)) > 1) else None
         X_train, X_test, y_train, y_test = train_test_split(
-            X, y_arr, test_size=0.2, random_state=42, stratify=stratify
+            X, y_arr, test_size=0.2, random_state=seed, stratify=stratify
         )
 
         logs.append(
@@ -435,6 +473,8 @@ def run_model_trainer(state: AgentState) -> dict:
                     task_type=task_type,
                     scale_pos=scale_pos,
                     provider=state["provider"],
+                    primary_metric=primary_metric,
+                    seed=seed,
                 )
                 for m in suggested_models
             ]

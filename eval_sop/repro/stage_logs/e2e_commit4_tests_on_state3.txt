@@ -1,0 +1,35 @@
+....F                                                                    [100%]
+================================== FAILURES ===================================
+__________________ test_generated_code_does_not_see_api_keys __________________
+
+tmp_path = WindowsPath('<HOME>/AppData/Local/Temp/pytest-of-<user>/pytest-652/test_generated_code_does_not_s0')
+
+    def test_generated_code_does_not_see_api_keys(tmp_path):
+        from sandbox.executor import _execute_subprocess
+    
+        code = (
+            "import os\n"
+            "leaked = sorted(k for k in os.environ if 'KEY' in k or 'TOKEN' in k)\n"
+            "print('LEAKED=' + ','.join(leaked))\n"
+            "print('CWD=' + os.getcwd())\n"
+        )
+        with patch.dict(os.environ, {"ANTHROPIC_API_KEY": "sk-secret", "GROQ_API_KEY": "g"}):
+            res = _execute_subprocess(code, "", 30)
+        assert res["success"], res["stderr"]
+>       assert "LEAKED=\n" in res["stdout"] or res["stdout"].startswith("LEAKED=\n")
+E       AssertionError: assert ('LEAKED=\n' in 'LEAKED=ANTHROPIC_API_KEY,CLAUDE_CODE_MESSAGING_TOKEN,GROQ_API_KEY\nCWD=<SCRATCH>\\wt\\amlpb_stage3\n' or False)
+E        +  where False = <built-in method startswith of str object at 0x0000018B62EE6340>('LEAKED=\n')
+E        +    where <built-in method startswith of str object at 0x0000018B62EE6340> = 'LEAKED=ANTHROPIC_API_KEY,CLAUDE_CODE_MESSAGING_TOKEN,GROQ_API_KEY\nCWD=<SCRATCH>\\wt\\amlpb_stage3\n'.startswith
+
+tests\test_e2e_from_commit4.py:201: AssertionError
+============================== warnings summary ===============================
+tests/test_e2e_from_commit4.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+tests/test_e2e_from_commit4.py::test_plan_reaches_trainer_and_evaluator_through_the_graph
+  <HOME>\anaconda3\Lib\site-packages\importlib_metadata\__init__.py:483: DeprecationWarning: Implicit None on return values is deprecated and will raise KeyErrors.
+    return self.metadata['Version']
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_e2e_from_commit4.py::test_generated_code_does_not_see_api_keys
+1 failed, 4 passed, 2 warnings in 29.24s
+exit=1

@@ -41,6 +41,11 @@ SENSITIVE_FEATURES = {
 _LOWER_IS_BETTER = {"rmse", "mape"}
 
 
+def _cv_is_valid(r: dict[str, Any]) -> bool:
+    m = str(r.get("cv_metric") or "")
+    return bool(m) and not m.startswith(("skipped", "failed"))
+
+
 def _select_winner(
     model_results: dict[str, Any], primary_metric: str
 ) -> tuple[str | None, list[str]]:
@@ -48,8 +53,20 @@ def _select_winner(
     Deterministically rank models by the primary metric (no LLM in the loop).
 
     Selection is pure argmax/argmin on a number — the LLM only narrates the
-    decision afterwards. Failed models are excluded. Ties fall back to the
-    leakage-free cross-validation mean.
+    decision afterwards. Failed models are excluded. Ties are broken by model
+    name so the ranking is reproducible.
+
+    Ranking is by the cross-validated score on the TRAINING split, which the
+    trainer computes with the scorer for `primary_metric`. It used to rank on
+    the holdout test metric, i.e. select on the test set and then report that
+    same test number as the result, an optimistic bias. The holdout metric is
+    now only reported, never used to choose.
+
+    Models whose CV failed are ranked after every model with a valid CV score
+    and cannot win while any valid score exists. (Previously one failed CV run
+    sent the whole selection to the test set.) Only if no model has a valid CV
+    score, e.g. CV skipped above the row cap, is the holdout metric used, as a
+    last resort; `selection_basis()` says which.
     """
     valid = {
         n: r
@@ -59,22 +76,31 @@ def _select_winner(
     if not valid:
         return None, []
 
+    cv_ok = [n for n, r in valid.items() if _cv_is_valid(r)]
+    if cv_ok:
+        # CV scorers are all "higher is better" (neg_* for error metrics).
+        ranked = sorted(cv_ok, key=lambda n: (float(valid[n].get("cv_mean", -1e18)), n), reverse=True)
+        ranked += sorted(n for n in valid if n not in cv_ok)
+        return ranked[0], ranked
+
     lower_better = primary_metric in _LOWER_IS_BETTER
 
-    def sort_key(name: str) -> tuple[float, float]:
+    def sort_key(name: str) -> tuple[float, str]:
         r = valid[name]
-        metrics = r.get("metrics", {})
-        primary = metrics.get(primary_metric)
+        primary = r.get("metrics", {}).get(primary_metric)
         # Orient so that "bigger key = better" regardless of metric direction.
-        primary_key = (
-            (-float(primary) if lower_better else float(primary))
-            if primary is not None
-            else -1e18
-        )
-        return (primary_key, float(r.get("cv_mean", 0.0)))
+        if primary is None:
+            return (-1e18, name)
+        return ((-float(primary) if lower_better else float(primary)), name)
 
     ranking = sorted(valid, key=sort_key, reverse=True)
     return ranking[0], ranking
+
+
+def selection_basis(model_results: dict[str, Any]) -> str:
+    """'cv' when the winner was chosen on CV, 'holdout' when no model had a valid CV score."""
+    valid = [r for r in model_results.values() if not r.get("error")]
+    return "cv" if any(_cv_is_valid(r) for r in valid) else "holdout"
 
 
 # The LLM writes a human-readable justification for the ALREADY-decided winner.
@@ -296,7 +322,7 @@ def run_evaluator(state: AgentState) -> dict:
     try:
         model_results = state.get("model_results", {})
         profile = state.get("dataset_profile") or {}
-        plan = state.get("_orchestrator_plan") or {}
+        plan = state.get("orchestrator_plan") or {}
 
         task_type = profile.get("task_type", "classification")
         target_col = profile.get("target_column", "")
@@ -422,6 +448,7 @@ def run_evaluator(state: AgentState) -> dict:
             "ranking": ranking,
             "justification": justification,
             "primary_metric": primary_metric,
+            "selection_basis": selection_basis(model_results),
             "shap_plot_path": shap_plot_path,
             "bias_warnings": bias_warnings,
             "comparison_table": comparison_table,

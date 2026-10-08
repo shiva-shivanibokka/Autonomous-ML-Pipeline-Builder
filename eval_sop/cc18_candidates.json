@@ -1,0 +1,722 @@
+[
+ {
+  "openml_id": 23381,
+  "name": "dresses-sales",
+  "n_rows": 500,
+  "n_features_excl_target": 12,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 1063,
+  "name": "kc2",
+  "n_rows": 522,
+  "n_features_excl_target": 21,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 6332,
+  "name": "cylinder-bands",
+  "n_rows": 540,
+  "n_features_excl_target": 39,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 40994,
+  "name": "climate-model-simulation-crashes",
+  "n_rows": 540,
+  "n_features_excl_target": 20,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1510,
+  "name": "wdbc",
+  "n_rows": 569,
+  "n_features_excl_target": 30,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1480,
+  "name": "ilpd",
+  "n_rows": 583,
+  "n_features_excl_target": 10,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 11,
+  "name": "balance-scale",
+  "n_rows": 625,
+  "n_features_excl_target": 4,
+  "n_classes": 3,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 29,
+  "name": "credit-approval",
+  "n_rows": 690,
+  "n_features_excl_target": 15,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 15,
+  "name": "breast-w",
+  "n_rows": 699,
+  "n_features_excl_target": 9,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 188,
+  "name": "eucalyptus",
+  "n_rows": 736,
+  "n_features_excl_target": 19,
+  "n_classes": 5,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1464,
+  "name": "blood-transfusion-service-center",
+  "n_rows": 748,
+  "n_features_excl_target": 4,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 37,
+  "name": "diabetes",
+  "n_rows": 768,
+  "n_features_excl_target": 8,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 469,
+  "name": "analcatdata_dmft",
+  "n_rows": 797,
+  "n_features_excl_target": 4,
+  "n_classes": 6,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 458,
+  "name": "analcatdata_authorship",
+  "n_rows": 841,
+  "n_features_excl_target": 70,
+  "n_classes": 4,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 54,
+  "name": "vehicle",
+  "n_rows": 846,
+  "n_features_excl_target": 18,
+  "n_classes": 4,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 50,
+  "name": "tic-tac-toe",
+  "n_rows": 958,
+  "n_features_excl_target": 9,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 307,
+  "name": "vowel",
+  "n_rows": 990,
+  "n_features_excl_target": 12,
+  "n_classes": 11,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 31,
+  "name": "credit-g",
+  "n_rows": 1000,
+  "n_features_excl_target": 20,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1494,
+  "name": "qsar-biodeg",
+  "n_rows": 1055,
+  "n_features_excl_target": 41,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1468,
+  "name": "cnae-9",
+  "n_rows": 1080,
+  "n_features_excl_target": 856,
+  "n_classes": 9,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40966,
+  "name": "MiceProtein",
+  "n_rows": 1080,
+  "n_features_excl_target": 81,
+  "n_classes": 8,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 1068,
+  "name": "pc1",
+  "n_rows": 1109,
+  "n_features_excl_target": 21,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 1462,
+  "name": "banknote-authentication",
+  "n_rows": 1372,
+  "n_features_excl_target": 4,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 1049,
+  "name": "pc4",
+  "n_rows": 1458,
+  "n_features_excl_target": 37,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 23,
+  "name": "cmc",
+  "n_rows": 1473,
+  "n_features_excl_target": 9,
+  "n_classes": 3,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 1050,
+  "name": "pc3",
+  "n_rows": 1563,
+  "n_features_excl_target": 37,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 1501,
+  "name": "semeion",
+  "n_rows": 1593,
+  "n_features_excl_target": 256,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40975,
+  "name": "car",
+  "n_rows": 1728,
+  "n_features_excl_target": 6,
+  "n_classes": 4,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 40982,
+  "name": "steel-plates-fault",
+  "n_rows": 1941,
+  "n_features_excl_target": 27,
+  "n_classes": 7,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 18,
+  "name": "mfeat-morphological",
+  "n_rows": 2000,
+  "n_features_excl_target": 6,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 12,
+  "name": "mfeat-factors",
+  "n_rows": 2000,
+  "n_features_excl_target": 216,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 22,
+  "name": "mfeat-zernike",
+  "n_rows": 2000,
+  "n_features_excl_target": 47,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 16,
+  "name": "mfeat-karhunen",
+  "n_rows": 2000,
+  "n_features_excl_target": 64,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40979,
+  "name": "mfeat-pixel",
+  "n_rows": 2000,
+  "n_features_excl_target": 240,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 14,
+  "name": "mfeat-fourier",
+  "n_rows": 2000,
+  "n_features_excl_target": 76,
+  "n_classes": 10,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 1067,
+  "name": "kc1",
+  "n_rows": 2109,
+  "n_features_excl_target": 21,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 40984,
+  "name": "segment",
+  "n_rows": 2310,
+  "n_features_excl_target": 19,
+  "n_classes": 7,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "robustness"
+ },
+ {
+  "openml_id": 1487,
+  "name": "ozone-level-8hr",
+  "n_rows": 2534,
+  "n_features_excl_target": 72,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 1485,
+  "name": "madelon",
+  "n_rows": 2600,
+  "n_features_excl_target": 500,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40670,
+  "name": "dna",
+  "n_rows": 3186,
+  "n_features_excl_target": 180,
+  "n_classes": 3,
+  "passes_row_filter": true,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 46,
+  "name": "splice",
+  "n_rows": 3190,
+  "n_features_excl_target": 60,
+  "n_classes": 3,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 3,
+  "name": "kr-vs-kp",
+  "n_rows": 3196,
+  "n_features_excl_target": 36,
+  "n_classes": 2,
+  "passes_row_filter": true,
+  "features_le_60": true,
+  "set": "main"
+ },
+ {
+  "openml_id": 40978,
+  "name": "Internet-Advertisements",
+  "n_rows": 3279,
+  "n_features_excl_target": 1558,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 4134,
+  "name": "Bioresponse",
+  "n_rows": 3751,
+  "n_features_excl_target": 1776,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 38,
+  "name": "sick",
+  "n_rows": 3772,
+  "n_features_excl_target": 29,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 44,
+  "name": "spambase",
+  "n_rows": 4601,
+  "n_features_excl_target": 57,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 40983,
+  "name": "wilt",
+  "n_rows": 4839,
+  "n_features_excl_target": 5,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 40701,
+  "name": "churn",
+  "n_rows": 5000,
+  "n_features_excl_target": 20,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1489,
+  "name": "phoneme",
+  "n_rows": 5404,
+  "n_features_excl_target": 5,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1497,
+  "name": "wall-robot-navigation",
+  "n_rows": 5456,
+  "n_features_excl_target": 24,
+  "n_classes": 4,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 40499,
+  "name": "texture",
+  "n_rows": 5500,
+  "n_features_excl_target": 40,
+  "n_classes": 11,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 28,
+  "name": "optdigits",
+  "n_rows": 5620,
+  "n_features_excl_target": 64,
+  "n_classes": 10,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 1475,
+  "name": "first-order-theorem-proving",
+  "n_rows": 6118,
+  "n_features_excl_target": 51,
+  "n_classes": 6,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 182,
+  "name": "satimage",
+  "n_rows": 6430,
+  "n_features_excl_target": 36,
+  "n_classes": 6,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 300,
+  "name": "isolet",
+  "n_rows": 7797,
+  "n_features_excl_target": 617,
+  "n_classes": 26,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 4538,
+  "name": "GesturePhaseSegmentationProcessed",
+  "n_rows": 9873,
+  "n_features_excl_target": 32,
+  "n_classes": 5,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1478,
+  "name": "har",
+  "n_rows": 10299,
+  "n_features_excl_target": 561,
+  "n_classes": 6,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 1053,
+  "name": "jm1",
+  "n_rows": 10885,
+  "n_features_excl_target": 21,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 32,
+  "name": "pendigits",
+  "n_rows": 10992,
+  "n_features_excl_target": 16,
+  "n_classes": 10,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 4534,
+  "name": "PhishingWebsites",
+  "n_rows": 11055,
+  "n_features_excl_target": 30,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 6,
+  "name": "letter",
+  "n_rows": 20000,
+  "n_features_excl_target": 16,
+  "n_classes": 26,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1486,
+  "name": "nomao",
+  "n_rows": 34465,
+  "n_features_excl_target": 118,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 41027,
+  "name": "jungle_chess_2pcs_raw_endgame_complete",
+  "n_rows": 44819,
+  "n_features_excl_target": 6,
+  "n_classes": 3,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1461,
+  "name": "bank-marketing",
+  "n_rows": 45211,
+  "n_features_excl_target": 16,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 151,
+  "name": "electricity",
+  "n_rows": 45312,
+  "n_features_excl_target": 8,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 1590,
+  "name": "adult",
+  "n_rows": 48842,
+  "n_features_excl_target": 14,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 40927,
+  "name": "CIFAR_10",
+  "n_rows": 60000,
+  "n_features_excl_target": 3072,
+  "n_classes": 10,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40668,
+  "name": "connect-4",
+  "n_rows": 67557,
+  "n_features_excl_target": 42,
+  "n_classes": 3,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ },
+ {
+  "openml_id": 554,
+  "name": "mnist_784",
+  "n_rows": 70000,
+  "n_features_excl_target": 784,
+  "n_classes": 10,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40996,
+  "name": "Fashion-MNIST",
+  "n_rows": 70000,
+  "n_features_excl_target": 784,
+  "n_classes": 10,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 40923,
+  "name": "Devnagari-Script",
+  "n_rows": 92000,
+  "n_features_excl_target": 1024,
+  "n_classes": 46,
+  "passes_row_filter": false,
+  "features_le_60": false,
+  "set": ""
+ },
+ {
+  "openml_id": 23517,
+  "name": "numerai28.6",
+  "n_rows": 96320,
+  "n_features_excl_target": 21,
+  "n_classes": 2,
+  "passes_row_filter": false,
+  "features_le_60": true,
+  "set": ""
+ }
+]

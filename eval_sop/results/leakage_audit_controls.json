@@ -1,0 +1,100 @@
+[
+  {
+    "openml_id": 37,
+    "dataset": "diabetes",
+    "rows_full_in_out": [
+      768,
+      768
+    ],
+    "rows_train_in_out": [
+      614,
+      614
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [],
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok",
+    "control": "per_row_ratio (safe)"
+  },
+  {
+    "openml_id": 37,
+    "dataset": "diabetes",
+    "rows_full_in_out": [
+      768,
+      768
+    ],
+    "rows_train_in_out": [
+      614,
+      614
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [
+      "plas"
+    ],
+    "target_dependent_cols": [],
+    "cross_row_dependence": true,
+    "target_leakage": false,
+    "status": "ok",
+    "control": "global_standardize (leaky)"
+  },
+  {
+    "openml_id": 37,
+    "dataset": "diabetes",
+    "rows_full_in_out": [
+      768,
+      768
+    ],
+    "rows_train_in_out": [
+      614,
+      614
+    ],
+    "row_change": false,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": [
+      "age_te"
+    ],
+    "target_dependent_cols": [
+      "age_te"
+    ],
+    "cross_row_dependence": true,
+    "target_leakage": true,
+    "status": "ok",
+    "control": "target_mean_encode (leaky)"
+  },
+  {
+    "openml_id": 37,
+    "dataset": "diabetes",
+    "rows_full_in_out": [
+      768,
+      17
+    ],
+    "rows_train_in_out": [
+      614,
+      17
+    ],
+    "row_change": true,
+    "target_kept": true,
+    "schema_differs": false,
+    "cols_only_full": [],
+    "cols_only_train": [],
+    "value_diff_cols": null,
+    "target_dependent_cols": [],
+    "cross_row_dependence": false,
+    "target_leakage": false,
+    "status": "ok",
+    "control": "drop_duplicates (row change)"
+  }
+]

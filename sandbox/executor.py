@@ -136,7 +136,10 @@ def _execute_e2b(code: str, csv_path: str, timeout: int) -> dict:
             "stdout": stdout,
             "stderr": stderr,
             "error_text": error or stderr,
-            "output_csv_path": output_csv_path or csv_path,
+            # No fallback to the raw input: an empty path means "nothing was
+            # written", which execute_with_retry turns into a loud failure when
+            # the caller requires an output.
+            "output_csv_path": output_csv_path,
         }
     finally:
         sbx.kill()
@@ -180,19 +183,74 @@ def _output_csv_for(csv_path: str) -> str:
     return str(p.with_name(f"{p.stem}_processed{p.suffix or '.csv'}"))
 
 
+# Environment variables the child interpreter actually needs. Everything else,
+# notably ANTHROPIC_API_KEY / OPENAI_API_KEY / GROQ_API_KEY / E2B_API_KEY, is
+# withheld: the script is LLM-generated and used to inherit the full parent
+# environment, so it could read (or exfiltrate) every provider key.
+_SAFE_ENV_KEYS = (
+    "PATH",
+    "SYSTEMROOT",
+    "WINDIR",
+    "COMSPEC",
+    "PATHEXT",
+    "NUMBER_OF_PROCESSORS",
+    "PROCESSOR_ARCHITECTURE",
+    "LANG",
+    "LC_ALL",
+)
+
+
+def _sandbox_env(workdir: str) -> dict[str, str]:
+    """A minimal environment for running generated code: no secrets, temp HOME."""
+    env = {k: os.environ[k] for k in _SAFE_ENV_KEYS if k in os.environ}
+    env.update(
+        {
+            "HOME": workdir,
+            "USERPROFILE": workdir,
+            "TEMP": workdir,
+            "TMP": workdir,
+            "MPLCONFIGDIR": workdir,
+            "PYTHONHASHSEED": "0",
+            "PYTHONIOENCODING": "utf-8",
+            "PYTHONNOUSERSITE": "1",
+        }
+    )
+    return env
+
+
 def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
     """Execute code in a local subprocess with timeout (fallback for local dev)."""
+    # The script runs with cwd = a throwaway directory, so a relative path from
+    # the caller (the API passes "uploads/<id>.csv") must be made absolute here.
+    if csv_path:
+        csv_path = str(Path(csv_path).resolve())
     output_csv = _output_csv_for(csv_path)
-    code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", csv_path)
-    code_with_path = _rewrite_path_constant(
-        code_with_path, "OUTPUT_CSV_PATH", output_csv
-    )
 
-    with tempfile.NamedTemporaryFile(
-        suffix=".py", mode="w", delete=False, encoding="utf-8"
-    ) as f:
+    # A throwaway working directory per run: the script's cwd, HOME and TEMP,
+    # so relative writes land somewhere disposable rather than in the repo.
+    workdir = tempfile.mkdtemp(prefix="amlpb_exec_")
+
+    # The script only ever sees paths inside the throwaway directory: the input
+    # is copied in and the output is moved back out afterwards. Handing it the
+    # real upload path let it walk up to the project root (and its .env). This
+    # narrows that one exposure; it is NOT a sandbox (the script can still open
+    # absolute paths, read the registry and use the network).
+    local_in = os.path.join(workdir, "input.csv") if csv_path else ""
+    local_out = os.path.join(workdir, "processed.csv") if output_csv else ""
+    if csv_path and Path(csv_path).exists():
+        import shutil
+
+        shutil.copyfile(csv_path, local_in)
+    code_with_path = _rewrite_path_constant(code, "INPUT_CSV_PATH", local_in)
+    code_with_path = _rewrite_path_constant(code_with_path, "OUTPUT_CSV_PATH", local_out)
+
+    script_path = os.path.join(workdir, "generated.py")
+    with open(script_path, "w", encoding="utf-8") as f:
         f.write(code_with_path)
-        script_path = f.name
+
+    # A stale output from an earlier attempt must not count as this attempt's.
+    if output_csv and Path(output_csv).exists():
+        os.unlink(output_csv)
 
     try:
         result = subprocess.run(
@@ -202,16 +260,25 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             [sys.executable, script_path],
             capture_output=True,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             timeout=timeout,
+            cwd=workdir,
+            env=_sandbox_env(workdir),
         )
         success = result.returncode == 0
+        if local_out and Path(local_out).exists():
+            import shutil
+
+            shutil.move(local_out, output_csv)
         return {
             "success": success,
             "stdout": result.stdout,
             "stderr": result.stderr,
             "error_text": result.stderr if not success else "",
+            # No silent fallback to the raw CSV (see execute_with_retry).
             "output_csv_path": (
-                output_csv if output_csv and Path(output_csv).exists() else csv_path
+                output_csv if output_csv and Path(output_csv).exists() else ""
             ),
         }
     except subprocess.TimeoutExpired:
@@ -220,10 +287,12 @@ def _execute_subprocess(code: str, csv_path: str, timeout: int) -> dict:
             "stdout": "",
             "stderr": f"Subprocess timed out after {timeout}s",
             "error_text": f"Timeout after {timeout}s",
-            "output_csv_path": csv_path,
+            "output_csv_path": "",
         }
     finally:
-        os.unlink(script_path)
+        import shutil
+
+        shutil.rmtree(workdir, ignore_errors=True)
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
@@ -235,6 +304,7 @@ def execute_with_retry(
     llm: Any,
     max_retries: int = 3,
     timeout: int | None = None,
+    require_output: bool = False,
 ) -> dict:
     """
     Execute code in a sandbox with self-correction on failure.
@@ -245,6 +315,11 @@ def execute_with_retry(
         llm:         LangChain LLM instance for self-correction.
         max_retries: Maximum number of correction attempts.
         timeout:     Execution timeout in seconds.
+        require_output: If True, a run that exits cleanly but writes no
+                     OUTPUT_CSV_PATH counts as a failure (and is fed to the
+                     self-correction loop). The feature engineer sets this:
+                     it used to fall back silently to the raw CSV, so a
+                     script that did nothing looked like a success.
 
     Returns:
         Dict with keys:
@@ -282,7 +357,18 @@ def execute_with_retry(
                 "stdout": "",
                 "stderr": str(exc),
                 "error_text": str(exc),
-                "output_csv_path": csv_path,
+                "output_csv_path": "",
+            }
+
+        if result["success"] and require_output and not result.get("output_csv_path"):
+            result = {
+                **result,
+                "success": False,
+                "error_text": (
+                    "The script exited without error but did not write its output "
+                    "CSV to OUTPUT_CSV_PATH. It must save the transformed DataFrame "
+                    "with df.to_csv(OUTPUT_CSV_PATH, index=False)."
+                ),
             }
 
         if result["success"]:
@@ -312,5 +398,5 @@ def execute_with_retry(
         "final_code": current_code,
         "attempts": max_retries,
         "last_error": last_error,
-        "output_csv_path": csv_path,
+        "output_csv_path": "",
     }
