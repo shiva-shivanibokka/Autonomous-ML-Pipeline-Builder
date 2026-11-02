@@ -13,7 +13,7 @@
 > ### Recruiter TL;DR
 > - **What it is:** a full-stack AI system that turns a raw CSV + a plain-English goal into a trained, SHAP-explained, deployment-ready ML model — built end to end by a 7-agent LangGraph crew, with a Next.js console that streams every agent's work in real time.
 > - **Hardest problem solved:** eliminating train/test **data leakage** across the whole flow (preprocessing is a scikit-learn `Pipeline` fit on the training fold only) *and* shipping a **runnable** artifact — the full pipeline serializes to `model.pkl`, so the generated FastAPI service predicts on raw input with zero training/serving skew.
-> - **Production concerns are addressed, not gestured at:** 83 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), a Docker image built on every push, and a Cloud Run + Vercel deployment path with a documented runbook.
+> - **Production concerns are addressed, not gestured at:** 92 automated tests (CI-green), structured JSON logging + Prometheus metrics, security hardening (no arbitrary file reads, sandboxed code execution, keys never stored), a Docker image built on every push, and a Cloud Run + Vercel deployment path with a documented runbook.
 
 A LangGraph crew of seven agents plans the approach, profiles the data, engineers leakage-safe features, trains and cross-validates several models in parallel, explains the winner with SHAP, and emits a runnable FastAPI + Docker inference bundle. A Next.js console streams every agent's work in real time.
 
@@ -132,7 +132,7 @@ Real capabilities exercised in this repo (mapped to how they're usually named), 
 | **Application security** | Server-issued upload IDs (no arbitrary file read), sandboxed execution, no stored keys, CORS allowlist, fail-loud prod boot |
 | **Containerization & CI/CD** | Non-root Dockerfile built in CI, GitHub Actions (lint + test + image build + frontend build) |
 | **Cloud-native deployment (GCP Cloud Run · Vercel)** | Deploy script + runbook (`deploy/`) — configured, not yet live |
-| **Automated testing** | 83 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
+| **Automated testing** | 92 pytest tests incl. security, ML-correctness, RAG-quality, and regression checks (`tests/`) |
 | **Frontend engineering** | Next.js (App Router) + TypeScript console with live streaming (`web/`) |
 
 ## Tech stack
